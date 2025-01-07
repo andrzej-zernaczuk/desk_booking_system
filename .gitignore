@@ -164,3 +164,5 @@ cython_debug/
 # pyinstaller outputs
 /build
 /dist
+
+/.vscode
