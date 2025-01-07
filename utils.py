@@ -1,19 +1,19 @@
 import tkinter as tk
 from screeninfo import get_monitors
 
-def show_frame(frame, all_frames):
+def show_frame(frame: tk.Frame, all_frames: list[tk.Frame]):
     # Hide all frames
     for f in all_frames:
-        f.pack_forget()
+        f.grid_forget()
 
     # Show the selected frame
-    frame.pack(fill=tk.BOTH, expand=True)
+    frame.grid(row=0, column=0, sticky="nsew")
 
     # Force an update to ensure all widgets are properly displayed
     frame.update_idletasks()
 
 
-def on_success(frame_to_be_shown, all_frames):
+def on_success(frame_to_be_shown: tk.Frame, all_frames: list[tk.Frame]):
     """Callback to transition to the success frame."""
     show_frame(frame_to_be_shown, all_frames)
 

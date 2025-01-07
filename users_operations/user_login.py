@@ -1,4 +1,5 @@
 import bcrypt
+import logging
 import tkinter as tk
 from tkinter import messagebox
 from sqlalchemy import select
@@ -7,7 +8,7 @@ from sqlalchemy.orm import Session
 from db.db_models import User
 
 
-def login(email: str, password: str, session_factory, on_success_callback):
+def login(email: str, password: str, session_factory: Session, on_success_callback: callable):
     """
     Handles the login process.
 
@@ -31,12 +32,14 @@ def login(email: str, password: str, session_factory, on_success_callback):
 
         if not user:
             messagebox.showerror("Login Error", "Invalid email or password.")
+            logging.error(f"User with email {email} not found.")
             return
 
         # Verify the password
         if bcrypt.checkpw(password.encode('utf-8'), user.password.encode('utf-8')):
-            on_success_callback
+            on_success_callback()
         else:
+            logging.error(f"Invalid password for user with email {email}.")
             messagebox.showerror("Login Error", "Invalid email or password.")
     except Exception as e:
         messagebox.showerror("Database Error", f"An error occurred: {e}")

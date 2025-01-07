@@ -5,11 +5,11 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, scoped_session
 from google.cloud.sql.connector import Connector
 
-from db.db_models import Base, Role, Department, Status
-from db.csv_import import import_simple_data_structure
+from db.db_models import Base, Role, Department, Status, Office, Floor, Sector, Desk
+from db.csv_import import import_table_data
 
 # Load environment variables
-load_dotenv("./app/.env")
+load_dotenv("../.env")
 
 # Initialize Connector object
 connector = Connector()
@@ -40,26 +40,34 @@ Session = scoped_session(sessionmaker(autocommit=False, autoflush=False, bind=de
 
 def create_tables():
     """Creates all tables defined in the ORM models."""
-    Base.metadata.create_all(bind=desk_booking_engine)
-    logging.info("Database tables created successfully.")
+    try:
+        Base.metadata.create_all(bind=desk_booking_engine)
+        logging.info("Database tables are ready.")
+    except Exception as error:
+        logging.error(f"Error while creating tables: {error}")
+        exit()
+
 
 def preload_data():
     """Preloads data into the database from CSV files."""
     try:
         session_import = Session()
-        import_simple_data_structure(Role, "db/data/roles.csv", "role_name", session_import)
-        import_simple_data_structure(Department, "db/data/departments.csv", "department_name", session_import)
-        import_simple_data_structure(Status, "db/data/statuses.csv", "status_name", session_import)
+        import_table_data(Role, "db/data/roles.csv", ["role_name"], session_import)
+        import_table_data(Department, "db/data/departments.csv", ["department_name"], session_import)
+        import_table_data(Status, "db/data/statuses.csv", ["status_name"], session_import)
+        import_table_data(Office, "db/data/offices.csv", ["office_name"], session_import)
+        import_table_data(Floor, "db/data/floors.csv", ["office_id", "floor_name"], session_import)
+        import_table_data(Sector, "db/data/sectors.csv", ["floor_id", "sector_name"], session_import)
+        import_table_data(Desk, "db/data/desks.csv", ["office_id", "floor_id", "sector_id", "local_id"], session_import)
         session_import.commit()
-        logging.info("Data preloaded successfully.")
+        logging.info("Data is ready.")
     except Exception as error:
         logging.error(f"Error while preloading data: {error}")
         session_import.rollback()
+        exit()
+    except ValueError as val_err:
+        logging.error(f"Error while preloading data: {val_err}")
+        session_import.rollback()
+        exit()
     finally:
         session_import.close()
-
-# Initialize the database (tables and optional preloading)
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
-    create_tables()
-    preload_data()

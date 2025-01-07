@@ -20,7 +20,7 @@ class Role(Base):
     role_id = Column(Integer, primary_key=True, autoincrement=True)
     role_name = Column(String, unique=True, nullable=False)
 
-    # Relationship to "User"
+    # Relationships
     users = relationship("User", back_populates="role")
 
     def __repr__(self):
@@ -33,7 +33,7 @@ class Department(Base):
     department_id = Column(Integer, primary_key=True, autoincrement=True)
     department_name = Column(String, unique=True, nullable=False)
 
-    # Relationship to "User"
+    # Relationships
     users = relationship("User", back_populates="department")
 
     def __repr__(self):
@@ -45,14 +45,11 @@ class User(Base):
     __tablename__ = "users"
 
     user_id = Column(Integer, primary_key=True, autoincrement=True)
-    username = Column(String, unique=True, nullable=False)
-    password = Column(String, nullable=False)
     email = Column(String, unique=True, nullable=False)
+    password = Column(String, nullable=False)
 
     role_id = Column(Integer, ForeignKey("roles.role_id"), nullable=False)
     department_id = Column(Integer, ForeignKey("departments.department_id"), nullable=False)
-
-    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
 
     # Relationships
     role = relationship("Role", back_populates="users")
@@ -66,26 +63,71 @@ class User(Base):
                 f"department_id={self.department_id})>")
 
 
+class Office(Base):
+    __tablename__ = "offices"
+
+    office_id = Column(Integer, primary_key=True, autoincrement=True)
+    office_name = Column(String, nullable=False, unique=True)
+
+    # Relationships
+    floors = relationship("Floor", back_populates="office")
+    desks = relationship("Desk", back_populates="office")
+
+    def __repr__(self):
+        return f"<Office(office_id={self.office_id}, office_name='{self.office_name}')>"
+
+class Floor(Base):
+    __tablename__ = "floors"
+
+    floor_id = Column(Integer, primary_key=True, autoincrement=True)
+    office_id = Column(Integer, ForeignKey("offices.office_id"), nullable=False)
+    floor_name = Column(String, nullable=False)
+
+    # Relationships
+    office = relationship("Office", back_populates="floors")
+    sectors = relationship("Sector", back_populates="floor")
+    desks = relationship("Desk", back_populates="floor")
+
+    def __repr__(self):
+        return (f"<Floor(floor_id={self.floor_id}, floor_name='{self.floor_name}', "
+                f"office_id={self.office_id})>")
+
+class Sector(Base):
+    __tablename__ = "sectors"
+
+    sector_id = Column(Integer, primary_key=True, autoincrement=True)
+    floor_id = Column(Integer, ForeignKey("floors.floor_id"), nullable=False)
+    sector_name = Column(String, nullable=False)
+
+    # Relationships
+    floor = relationship("Floor", back_populates="sectors")
+    desks = relationship("Desk", back_populates="sector")
+
+    def __repr__(self):
+        return (f"<Sector(sector_id={self.sector_id}, sector_name='{self.sector_name}', "
+                f"floor_id={self.floor_id})>")
+
 class Desk(Base):
     __tablename__ = "desks"
 
     desk_id = Column(Integer, primary_key=True, autoincrement=True)
-    office = Column(String, nullable=False)
-    floor = Column(Integer, nullable=False)
-    sector = Column(String, nullable=False)
+    office_id = Column(Integer, ForeignKey("offices.office_id"), nullable=False)
+    floor_id = Column(Integer, ForeignKey("floors.floor_id"), nullable=False)
+    sector_id = Column(Integer, ForeignKey("sectors.sector_id"), nullable=False)
     local_id = Column(Integer, nullable=False)
     desk_code = Column(String, unique=True, nullable=False)
     description = Column(String)
 
-    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
-
-    # Relationship to "Booking"
+    # Relationships
+    office = relationship("Office", back_populates="desks")
+    floor = relationship("Floor", back_populates="desks")
+    sector = relationship("Sector", back_populates="desks")
     bookings = relationship("Booking", back_populates="desk")
 
     def __repr__(self):
         return (f"<Desk(desk_id={self.desk_id}, desk_code='{self.desk_code}', "
-                f"office='{self.office}', floor={self.floor}, "
-                f"sector='{self.sector}')>")
+                f"office_id={self.office_id}, floor_id={self.floor_id}, "
+                f"sector_id={self.sector_id}, local_id={self.local_id})>")
 
 
 class Status(Base):
@@ -94,7 +136,7 @@ class Status(Base):
     status_id = Column(Integer, primary_key=True, autoincrement=True)
     status_name = Column(String, unique=True, nullable=False)
 
-    # Relationship to "Booking"
+    # Relationships
     bookings = relationship("Booking", back_populates="status")
 
     def __repr__(self):
@@ -133,7 +175,7 @@ class Log(Base):
 
     created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
 
-    # Relationship to "User"
+    # Relationships
     user = relationship("User", back_populates="logs")
 
     def __repr__(self):
