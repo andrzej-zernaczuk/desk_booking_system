@@ -262,7 +262,7 @@ def start_tkinter_app():
     show_frame(login_frame, all_frames)
 
     def on_closing():
-        close_shared_session()
+        close_shared_session(shared_session)
         root.destroy()
 
     root.protocol("WM_DELETE_WINDOW", on_closing)
