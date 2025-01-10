@@ -2,7 +2,7 @@ import os
 import logging
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, scoped_session
+from sqlalchemy.orm import sessionmaker, scoped_session, Session
 from google.cloud.sql.connector import Connector
 
 from db.db_models import Base, Role, Department, Status, Office, Floor, Sector, Desk
@@ -36,7 +36,7 @@ def init_engine():
 
 # Initialize the engine and session factory
 desk_booking_engine = init_engine()
-Session = scoped_session(sessionmaker(autocommit=False, autoflush=False, bind=desk_booking_engine))
+SessionFactory = scoped_session(sessionmaker(autocommit=False, autoflush=False, bind=desk_booking_engine))
 
 def create_tables():
     """Creates all tables defined in the ORM models."""
@@ -51,7 +51,7 @@ def create_tables():
 def preload_data():
     """Preloads data into the database from CSV files."""
     try:
-        session_import = Session()
+        session_import: Session = SessionFactory()
         import_table_data(Role, "db/data/roles.csv", ["role_name"], session_import)
         import_table_data(Department, "db/data/departments.csv", ["department_name"], session_import)
         import_table_data(Status, "db/data/statuses.csv", ["status_name"], session_import)
@@ -71,3 +71,13 @@ def preload_data():
         exit()
     finally:
         session_import.close()
+
+
+def initialize_app_db():
+    """Initialize the application by setting up the database."""
+    try:
+        create_tables()  # Create tables
+        preload_data()   # Preload data
+    except (Exception, ValueError) as error:
+        logging.error(f"Error during database initialization: {error}")
+        raise

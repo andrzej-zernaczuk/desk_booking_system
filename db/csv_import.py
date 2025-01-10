@@ -3,6 +3,7 @@ import logging
 import traceback
 from csv import reader
 from sqlalchemy import Table, select
+
 from db.db_models import Sector, Floor, Office
 
 
@@ -45,7 +46,7 @@ def create_desk_code(desk_data: dict, file_name: str, line: int, sql_session):
     ).scalar_one_or_none()
 
     if all([sector_name, floor_name, office_name]):
-        desk_data["desk_code"] = f"{office_name}-{floor_name}_{sector_name}_{desk_data['local_id']}"
+        desk_data["desk_code"] = f"{office_name}_{floor_name}_{sector_name}_{desk_data['local_id']}"
     else:
         raise ValueError(f"Sector with ID {sector_id} not found in the database.")
 

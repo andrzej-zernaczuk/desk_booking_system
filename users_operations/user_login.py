@@ -1,6 +1,7 @@
 import bcrypt
 import logging
 import tkinter as tk
+from typing import Callable
 from tkinter import messagebox
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -8,7 +9,7 @@ from sqlalchemy.orm import Session
 from db.db_models import User
 
 
-def login(email: str, password: str, session_factory: Session, on_success_callback: callable):
+def login(email: str, password: str, session_factory: Callable[[], Session], on_success_callback: Callable[[], None]):
     """
     Handles the login process.
 
