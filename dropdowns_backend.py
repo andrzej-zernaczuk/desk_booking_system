@@ -3,8 +3,10 @@ from typing import Callable, Generator, Optional
 from sqlalchemy.sql import select
 from sqlalchemy.orm import Session
 from contextlib import contextmanager
+from log_utils import log_event
 
 from db.db_models import Office, Floor, Sector, Desk
+from users_operations.user_login import get_current_user
 
 @contextmanager
 def managed_session(session_factory: Callable[[], Session]) -> Generator[Session, None, None]:
@@ -21,6 +23,7 @@ def managed_session(session_factory: Callable[[], Session]) -> Generator[Session
         yield session
     except Exception as exc:
         logging.error(f"Session error: {exc}")
+        log_event(get_current_user(), "Failure", "DB connection", f"Exception occured while creating managed session: {exc}")
         raise
     finally:
         if 'session' in locals() and session is not None:
@@ -28,7 +31,9 @@ def managed_session(session_factory: Callable[[], Session]) -> Generator[Session
 
 
 def get_available_offices(session_factory: Callable[[], Session]) -> list[str]:
-    """Fetch all available offices."""
+    """Fetch all available offices.
+
+    :param session_factory: A callable that returns a SQLAlchemy session"""
     try:
         with managed_session(session_factory) as session:
             stmt = select(Office.office_name)
@@ -36,11 +41,15 @@ def get_available_offices(session_factory: Callable[[], Session]) -> list[str]:
         return offices
     except Exception as exc:
         logging.error(f"Error fetching available offices: {exc}")
+        log_event(get_current_user(), "Failure", "Desk selection", f"Exception occured while fetching available offices: {exc}")
         return []
 
 
-def get_floors_in_office(office_name: str, session_factory: Callable[[], Session]) -> list[str]:
-    """Fetch all floors for a given office."""
+def get_floors_in_office(session_factory: Callable[[], Session], office_name: str) -> list[str]:
+    """Fetch all floors for a given office.
+
+    :param session_factory: A callable that returns a SQLAlchemy session
+    :param office_name: The office name"""
     try:
         with managed_session(session_factory) as session:
             stmt = (
@@ -52,11 +61,15 @@ def get_floors_in_office(office_name: str, session_factory: Callable[[], Session
         return floors
     except Exception as exc:
         logging.error(f"Error fetching floors for office '{office_name}': {exc}")
+        log_event(get_current_user(), "Failure", "Desk selection", f"Exception occured while fetching available office floors: {exc}")
         return []
 
 
-def get_sectors_on_floor(floor_name: str, session_factory: Callable[[], Session]) -> list[str]:
-    """Fetch all sectors for a given floor."""
+def get_sectors_on_floor(session_factory: Callable[[], Session], floor_name: str) -> list[str]:
+    """Fetch all sectors for a given floor.
+
+    :param session_factory: A callable that returns a SQLAlchemy session
+    :param floor_name: The floor name"""
     try:
         with managed_session(session_factory) as session:
             stmt = (
@@ -68,11 +81,15 @@ def get_sectors_on_floor(floor_name: str, session_factory: Callable[[], Session]
         return sectors
     except Exception as exc:
         logging.error(f"Error fetching sectors for floor '{floor_name}': {exc}")
+        log_event(get_current_user(), "Failure", "Desk selection", f"Exception occured while fetching available floor sectors: {exc}")
         return []
 
 
-def get_desks_on_floor(floor_name: str, sector_name: Optional[str], session_factory):
-    """Fetch desks for a specific floor."""
+def get_desks_on_floor(session_factory: Callable[[], Session], floor_name: str, sector_name: Optional[str]):
+    """Fetch desks for a specific floor.
+
+    :param session_factory: A callable that returns a SQLAlchemy session
+    :param floor_name: The floor name"""
     try:
         with managed_session(session_factory) as session:
             stmt = (
@@ -92,4 +109,5 @@ def get_desks_on_floor(floor_name: str, sector_name: Optional[str], session_fact
         return desks
     except Exception as exc:
         logging.error(f"Error fetching desks for floor '{floor_name}' and sector '{sector_name}': {exc}")
+        log_event(get_current_user(), "Failure", "Desk selection", f"Exception occured while fetching available desks: {exc}")
         return []

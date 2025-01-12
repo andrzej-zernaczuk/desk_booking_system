@@ -36,6 +36,7 @@ def init_engine():
 
 # Initialize the engine and session factory
 desk_booking_engine = init_engine()
+
 SessionFactory = scoped_session(sessionmaker(autocommit=False, autoflush=False, bind=desk_booking_engine))
 
 def create_tables():

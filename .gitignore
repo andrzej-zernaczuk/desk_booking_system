@@ -166,3 +166,4 @@ cython_debug/
 /dist
 
 /.vscode
+.DS_store

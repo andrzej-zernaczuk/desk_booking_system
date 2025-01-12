@@ -44,7 +44,7 @@ class Department(Base):
 class User(Base):
     __tablename__ = "users"
 
-    user_id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(String, primary_key=True, autoincrement=True)
     email = Column(String, unique=True, nullable=False)
     password = Column(String, nullable=False)
 
@@ -55,7 +55,6 @@ class User(Base):
     role = relationship("Role", back_populates="users")
     department = relationship("Department", back_populates="users")
     bookings = relationship("Booking", back_populates="user")
-    logs = relationship("Log", back_populates="user")
 
     def __repr__(self):
         return (f"<User(user_id={self.user_id}, username='{self.username}', "
@@ -148,7 +147,7 @@ class Booking(Base):
     __tablename__ = "bookings"
 
     booking_id = Column(Integer, primary_key=True, autoincrement=True)
-    user_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)
+    user_id = Column(String, ForeignKey("users.user_id"), nullable=False)
     desk_code = Column(String, ForeignKey("desks.desk_code"), nullable=False)
     start_date = Column(Date, nullable=False)
     end_date = Column(Date, nullable=False)
@@ -170,14 +169,12 @@ class Log(Base):
     __tablename__ = "logs"
 
     log_id = Column(Integer, primary_key=True, autoincrement=True)
-    user_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)
-    action = Column(String, nullable=False)
-
+    user_id = Column(String, nullable=False)
+    event_type = Column(String, nullable=False)
+    component = Column(String, nullable=False)
+    event_description = Column(String, nullable=False)
     created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
-
-    # Relationships
-    user = relationship("User", back_populates="logs")
 
     def __repr__(self):
         return (f"<Log(log_id={self.log_id}, user_id={self.user_id}, "
-                f"action='{self.action}', created_at={self.created_at})>")
+                f"event_type='{self.event_type}', event_description='{self.event_description}', created_at={self.created_at})>")

@@ -78,14 +78,14 @@ def import_table_data(table: Table, file_name: str, field_names: list, sql_sessi
                     sql_session.add(record)
 
             sql_session.commit()
-            logging.info(f"Succesfully inserted rows into {table.__tablename__} table")
+            logging.info(f"Succesfully inserted rows into '{table.__tablename__}' table")
         except Exception:
             sql_session.rollback()
             exc_type, exc_value, exc_tb = sys.exc_info()
             traceback_details = traceback.format_exception(exc_type, exc_value, exc_tb)
-            logging.error(f"Error when inserting data into {table.__tablename__} table: {''.join(traceback_details)}")
+            logging.error(f"Error when inserting data into '{table.__tablename__}' table: {''.join(traceback_details)}")
             raise
         finally:
             sql_session.close()
     else:
-        logging.info(f"{table.__tablename__} table is already populated")
+        logging.info(f"'{table.__tablename__}' table is already populated")
