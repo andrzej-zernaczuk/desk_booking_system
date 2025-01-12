@@ -1,16 +1,18 @@
+from datetime import datetime, timezone
 from sqlalchemy import (
     Column,
     String,
     Integer,
     DateTime,
     Date,
-    ForeignKey
+    ForeignKey,
+    UniqueConstraint
 )
 from sqlalchemy.orm import (
     declarative_base,
     relationship
 )
-from datetime import datetime, timezone
+from sqlalchemy.sql import func
 
 Base = declarative_base()
 
@@ -44,8 +46,8 @@ class Department(Base):
 class User(Base):
     __tablename__ = "users"
 
-    user_id = Column(String, primary_key=True, autoincrement=True)
-    email = Column(String, unique=True, nullable=False)
+    user_id = Column(Integer, primary_key=True, autoincrement=True)
+    user_name = Column(String, unique=True, nullable=False)
     password = Column(String, nullable=False)
 
     role_id = Column(Integer, ForeignKey("roles.role_id"), nullable=False)
@@ -57,9 +59,8 @@ class User(Base):
     bookings = relationship("Booking", back_populates="user")
 
     def __repr__(self):
-        return (f"<User(user_id={self.user_id}, username='{self.username}', "
-                f"email='{self.email}', role_id={self.role_id}, "
-                f"department_id={self.department_id})>")
+        return (f"<User(user_id={self.user_id}, user_name='{self.user_name}', "
+                f"role_id={self.role_id}, department_id={self.department_id})>")
 
 
 class Office(Base):
@@ -74,6 +75,7 @@ class Office(Base):
 
     def __repr__(self):
         return f"<Office(office_id={self.office_id}, office_name='{self.office_name}')>"
+
 
 class Floor(Base):
     __tablename__ = "floors"
@@ -97,6 +99,11 @@ class Sector(Base):
     sector_id = Column(Integer, primary_key=True, autoincrement=True)
     floor_id = Column(Integer, ForeignKey("floors.floor_id"), nullable=False)
     sector_name = Column(String, nullable=False)
+
+    # Composite unique constraint: sector_name + floor_id
+    __table_args__ = (
+        UniqueConstraint("floor_id", "sector_name", name="uq_floor_sector_name"),
+    )
 
     # Relationships
     floor = relationship("Floor", back_populates="sectors")
@@ -147,12 +154,12 @@ class Booking(Base):
     __tablename__ = "bookings"
 
     booking_id = Column(Integer, primary_key=True, autoincrement=True)
-    user_id = Column(String, ForeignKey("users.user_id"), nullable=False)
+    user_name = Column(String, ForeignKey("users.user_name"), nullable=False)
     desk_code = Column(String, ForeignKey("desks.desk_code"), nullable=False)
     start_date = Column(Date, nullable=False)
     end_date = Column(Date, nullable=False)
     status_id = Column(Integer, ForeignKey("statuses.status_id"), nullable=False)
-    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
 
     # Relationships
     user = relationship("User", back_populates="bookings")
@@ -160,7 +167,7 @@ class Booking(Base):
     status = relationship("Status", back_populates="bookings")
 
     def __repr__(self):
-        return (f"<Booking(booking_id={self.booking_id}, user_id={self.user_id}, "
+        return (f"<Booking(booking_id={self.booking_id}, user_name={self.user_name}, "
                 f"desk_code='{self.desk_code}', status_id={self.status_id}, "
                 f"start_date={self.start_date}, end_date={self.end_date})>")
 
@@ -169,12 +176,12 @@ class Log(Base):
     __tablename__ = "logs"
 
     log_id = Column(Integer, primary_key=True, autoincrement=True)
-    user_id = Column(String, nullable=False)
+    user_name = Column(String, nullable=False)
     event_type = Column(String, nullable=False)
     component = Column(String, nullable=False)
     event_description = Column(String, nullable=False)
-    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
 
     def __repr__(self):
-        return (f"<Log(log_id={self.log_id}, user_id={self.user_id}, "
+        return (f"<Log(log_id={self.log_id}, user_name={self.user_name}, "
                 f"event_type='{self.event_type}', event_description='{self.event_description}', created_at={self.created_at})>")

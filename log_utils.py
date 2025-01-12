@@ -18,11 +18,10 @@ def log_event(user_email: str, event_type: str, component: str, event_descriptio
 
     try:
         log_entry = Log(
-            user_id=user_email,
+            user_name=user_email,
             event_type=event_type,
             component=component,
             event_description=event_description,
-            created_at=datetime.now(timezone.utc)
         )
         session.add(log_entry)
         session.commit()
