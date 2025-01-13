@@ -3,11 +3,12 @@ import logging
 import traceback
 from csv import reader
 from sqlalchemy import Table, select
+from sqlalchemy.orm import Session
 
 from db.db_models import Sector, Floor, Office
 
 
-def if_table_populated(table: Table, sql_session) -> bool:
+def if_table_populated(sql_session: Session, table: Table) -> bool:
     """
     Check if table has rows.
 
@@ -24,7 +25,19 @@ def if_table_populated(table: Table, sql_session) -> bool:
         False
 
 
-def create_desk_code(desk_data: dict, file_name: str, line: int, sql_session):
+def create_desk_code(sql_session: Session, desk_data: dict, file_name: str, line: int) -> None:
+    """
+    Create desk code for each desk.
+
+    Args:
+        desk_data (dict): desk data
+        file_name (str): name of csv file
+        line (int): line number
+        session (_type_): current session object
+
+    Returns:
+        None
+    """
     sector_id = desk_data.get("sector_id", None)
     floor_id = desk_data.get("floor_id", None)
     office_id = desk_data.get("office_id", None)
@@ -51,7 +64,7 @@ def create_desk_code(desk_data: dict, file_name: str, line: int, sql_session):
         raise ValueError(f"Sector with ID {sector_id} not found in the database.")
 
 
-def import_table_data(table: Table, file_name: str, field_names: list, sql_session):
+def import_table_data(sql_session: Session, table: Table, file_name: str, field_names: list) -> None:
     """
     Import rows from csv file into table in database.
 
@@ -60,8 +73,11 @@ def import_table_data(table: Table, file_name: str, field_names: list, sql_sessi
         file_name (str): name of csv file
         field_names (list): list of field names
         session (_type_): current session object
+
+    Returns:
+        None
     """
-    if not if_table_populated(table, sql_session):
+    if not if_table_populated(sql_session, table):
         try:
             with open(file_name, "r") as file:
                 csv_file = reader(file, skipinitialspace=True)
@@ -72,7 +88,7 @@ def import_table_data(table: Table, file_name: str, field_names: list, sql_sessi
 
                     # if desks are being imported generate desk_code for each desk
                     if table.__tablename__ == "desks":
-                        create_desk_code(record_data, file_name, csv_file.line_num, sql_session)
+                        create_desk_code(sql_session, record_data, file_name, csv_file.line_num)
 
                     record = table(**record_data)
                     sql_session.add(record)

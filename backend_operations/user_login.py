@@ -9,14 +9,14 @@ from sqlalchemy.orm import Session
 
 from db.db_models import User
 from db.sql_db import SessionFactory
-from log_utils import log_event
+from backend_operations.log_utils import log_event
 
 
 # Initialize global variable storing logged-in user ID
 CURRENT_USER = None
 
 
-def login(email: str, password: str, on_success_callback: Callable[[], None]):
+def login(email: str, password: str, on_success_callback: Callable[[], None]) -> None:
     """
     Handles the login process.
 
@@ -70,18 +70,18 @@ def login(email: str, password: str, on_success_callback: Callable[[], None]):
     finally:
         session.close()
 
-def check_debug_mode():
+def check_debug_mode() -> bool:
     """Check if the debug mode is enabled."""
     load_dotenv("../.env")
     is_debug_mode = os.getenv("debug_mode")
     return is_debug_mode == "True"
 
 
-def get_current_user():
+def get_current_user() -> str:
     """Return the current user."""
     return CURRENT_USER
 
-def set_current_user(user_email: str):
+def set_current_user(user_email: str) -> None:
     """
     Set the current user.
 

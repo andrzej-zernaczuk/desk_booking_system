@@ -2,6 +2,11 @@ import tkinter as tk
 from screeninfo import get_monitors
 
 def show_frame(frame: tk.Frame, all_frames: list[tk.Frame]):
+    """Show a frame and hide all other frames.
+
+    :param frame: The frame to show
+    :param all_frames: A list of all frames
+    """
     # Hide all frames
     for f in all_frames:
         f.grid_forget()
@@ -14,11 +19,19 @@ def show_frame(frame: tk.Frame, all_frames: list[tk.Frame]):
 
 
 def on_success(frame_to_be_shown: tk.Frame, all_frames: list[tk.Frame]):
-    """Callback to transition to the success frame."""
+    """Callback to transition to the success frame.
+
+    :param frame_to_be_shown: The frame to be shown
+    :param all_frames: A list of all frames
+    """
     show_frame(frame_to_be_shown, all_frames)
 
 
 def center_window(window: tk.Tk):
+    """Center the window on the screen.
+
+    :param window: The window to center
+    """
     # Select primary monitor
     primary_monitor = get_monitors()[0]
 

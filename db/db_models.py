@@ -6,7 +6,8 @@ from sqlalchemy import (
     DateTime,
     Date,
     ForeignKey,
-    UniqueConstraint
+    UniqueConstraint,
+    Index
 )
 from sqlalchemy.orm import (
     declarative_base,
@@ -89,6 +90,12 @@ class Floor(Base):
     sectors = relationship("Sector", back_populates="floor")
     desks = relationship("Desk", back_populates="floor")
 
+    # PROJECT REQUIREMENT: indexes
+    # Indexes
+    __table_args__ = (
+        Index("idx_floors_office_floor_name", "office_id", "floor_name"),
+    )
+
     def __repr__(self):
         return (f"<Floor(floor_id={self.floor_id}, floor_name='{self.floor_name}', "
                 f"office_id={self.office_id})>")
@@ -108,6 +115,11 @@ class Sector(Base):
     # Relationships
     floor = relationship("Floor", back_populates="sectors")
     desks = relationship("Desk", back_populates="sector")
+
+    # Indexes
+    __table_args__ = (
+        Index("idx_sectors_floor_sector_name", "floor_id", "sector_name"),
+    )
 
     def __repr__(self):
         return (f"<Sector(sector_id={self.sector_id}, sector_name='{self.sector_name}', "
@@ -129,6 +141,11 @@ class Desk(Base):
     floor = relationship("Floor", back_populates="desks")
     sector = relationship("Sector", back_populates="desks")
     bookings = relationship("Booking", back_populates="desk")
+
+    # Indexes
+    __table_args__ = (
+        Index("idx_desks_office_floor_sector", "office_id", "floor_id", "sector_id"),
+    )
 
     def __repr__(self):
         return (f"<Desk(desk_id={self.desk_id}, desk_code='{self.desk_code}', "
@@ -166,6 +183,12 @@ class Booking(Base):
     desk = relationship("Desk", back_populates="bookings")
     status = relationship("Status", back_populates="bookings")
 
+    # Indexes
+    __table_args__ = (
+        Index("idx_bookings_date_range", "start_date", "end_date"),
+        Index("idx_bookings_user_desk_date", "user_name", "desk_code", "start_date", "end_date"),
+    )
+
     def __repr__(self):
         return (f"<Booking(booking_id={self.booking_id}, user_name={self.user_name}, "
                 f"desk_code='{self.desk_code}', status_id={self.status_id}, "
@@ -181,6 +204,11 @@ class Log(Base):
     component = Column(String, nullable=False)
     event_description = Column(String, nullable=False)
     created_at = Column(DateTime, nullable=False, server_default=func.now())
+
+    # Indexes
+    __table_args__ = (
+        Index("idx_logs_user_created_at", "user_name", "created_at"),
+    )
 
     def __repr__(self):
         return (f"<Log(log_id={self.log_id}, user_name={self.user_name}, "

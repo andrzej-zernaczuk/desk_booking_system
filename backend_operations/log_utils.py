@@ -6,7 +6,7 @@ from db.db_models import Log
 from db.sql_db import SessionFactory
 
 
-def log_event(user_email: str, event_type: str, component: str, event_description: str):
+def log_event(user_email: str, event_type: str, component: str, event_description: str) -> None:
     """
     Logs an event in the logs table.
 

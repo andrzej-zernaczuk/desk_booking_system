@@ -5,8 +5,8 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, scoped_session, Session
 from google.cloud.sql.connector import Connector
 
-from db.db_models import Base, Role, Department, Status, Office, Floor, Sector, Desk
 from db.csv_import import import_table_data
+from db.db_models import Base, Role, Department, Status, Office, Floor, Sector, Desk
 
 # Load environment variables
 load_dotenv("../.env")
@@ -53,13 +53,13 @@ def preload_data():
     """Preloads data into the database from CSV files."""
     try:
         session_import: Session = SessionFactory()
-        import_table_data(Role, "db/data/roles.csv", ["role_name"], session_import)
-        import_table_data(Department, "db/data/departments.csv", ["department_name"], session_import)
-        import_table_data(Status, "db/data/statuses.csv", ["status_name"], session_import)
-        import_table_data(Office, "db/data/offices.csv", ["office_name"], session_import)
-        import_table_data(Floor, "db/data/floors.csv", ["office_id", "floor_name"], session_import)
-        import_table_data(Sector, "db/data/sectors.csv", ["floor_id", "sector_name"], session_import)
-        import_table_data(Desk, "db/data/desks.csv", ["office_id", "floor_id", "sector_id", "local_id"], session_import)
+        import_table_data(session_import, Role, "db/data/roles.csv", ["role_name"])
+        import_table_data(session_import, Department, "db/data/departments.csv", ["department_name"])
+        import_table_data(session_import, Status, "db/data/statuses.csv", ["status_name"])
+        import_table_data(session_import, Office, "db/data/offices.csv", ["office_name"])
+        import_table_data(session_import, Floor, "db/data/floors.csv", ["office_id", "floor_name"])
+        import_table_data(session_import, Sector, "db/data/sectors.csv", ["floor_id", "sector_name"])
+        import_table_data(session_import, Desk, "db/data/desks.csv", ["office_id", "floor_id", "sector_id", "local_id"])
         session_import.commit()
         logging.info("Data is ready.")
     except Exception as error:
