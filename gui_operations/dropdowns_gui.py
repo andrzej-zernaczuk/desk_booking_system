@@ -4,6 +4,7 @@ from typing import Callable, Any
 from sqlalchemy.orm import Session
 from tkinter import messagebox
 from tkinter.ttk import Combobox, Button, Label
+from datetime import datetime, timedelta
 
 from backend_operations.log_utils import log_event
 from backend_operations.user_login import get_current_user
@@ -16,7 +17,95 @@ from backend_operations.dropdowns_backend import (
 )
 
 
-def populate_office_dropdown(shared_session: Callable) -> list[str]:
+def calculate_time_intervals(selected_date_str: datetime.date) -> dict[str, list[str]]:
+    """Calculate available time intervals for start and end time.
+
+    :param selected_date: The selected booking date.
+    :return: A dictionary with suggested start and end times.
+    """
+    # Current date and time
+    current_datetime = datetime.now()
+    current_date = current_datetime.date()
+    start_hour_sugg = 8  # Suggested start time if booked on the same day before work
+    end_hour_sugg = 16  # Default end hour suggestion
+
+    selected_date = datetime.strptime(selected_date_str, '%Y-%m-%d').date()
+
+    # Ensure the selected date is valid
+    if selected_date < current_date:
+        raise ValueError("Booking cannot be made for past dates.")
+
+    suggested_start_time = None
+    suggested_end_time = None
+    all_start_times = []
+    all_end_times = []
+
+    # If booking is created for the same day
+    if selected_date == current_date:
+        current_minute = current_datetime.minute
+        suggested_hour = current_datetime.hour
+
+        # If booking is made after 16:00
+        if suggested_hour >= 16:
+            rounded_minute = ((current_minute // 15) + 1) * 15
+            if rounded_minute >= 60:
+                suggested_hour += 1
+                rounded_minute = 0
+
+            suggested_start = current_datetime.replace(
+                hour=suggested_hour, minute=rounded_minute, second=0, microsecond=0
+            )
+            suggested_end = suggested_start + timedelta(minutes=15)
+
+        # If booking is made before or during work hours
+        else:
+            rounded_minute = ((current_minute // 15) + 1) * 15
+            if rounded_minute >= 60:
+                suggested_hour += 1
+                rounded_minute = 0
+
+            if suggested_hour < start_hour_sugg:
+                suggested_hour = start_hour_sugg
+                rounded_minute = 0
+
+            suggested_start = current_datetime.replace(
+                hour=suggested_hour, minute=rounded_minute, second=0, microsecond=0
+            )
+            suggested_end = current_datetime.replace(hour=end_hour_sugg, minute=0, second=0, microsecond=0)
+
+            # Adjust suggested end time if earlier than the first start
+            if suggested_end <= suggested_start:
+                suggested_end = suggested_start + timedelta(minutes=15)
+
+    # If booking is created for a future date
+    else:
+        suggested_start = datetime.combine(selected_date, datetime.min.time()).replace(hour=start_hour_sugg, minute=0)
+        suggested_end = suggested_start.replace(hour=end_hour_sugg, minute=0)
+
+    # Generate all valid start times for the day
+    first_possible_start = datetime.combine(selected_date, datetime.min.time()).replace(
+        hour=start_hour_sugg, minute=0, second=0, microsecond=0
+    )
+
+    start_time_to_add = first_possible_start
+    while start_time_to_add <= datetime.combine(current_datetime.date(), datetime.max.time()).replace(hour=23, minute=30):
+        all_start_times.append(start_time_to_add.strftime("%H:%M"))
+        start_time_to_add += timedelta(minutes=15)
+
+    # Generate all valid end times for the day
+    end_time_to_add = first_possible_start + timedelta(minutes=15)
+    while end_time_to_add <= datetime.combine(current_datetime.date(), datetime.max.time()).replace(hour=23, minute=45):
+        all_end_times.append(end_time_to_add.strftime("%H:%M"))
+        end_time_to_add += timedelta(minutes=15)
+
+    # Convert suggested times to strings
+    suggested_start_time = suggested_start.strftime("%H:%M")
+    suggested_end_time = suggested_end.strftime("%H:%M")
+
+    return suggested_start_time, suggested_end_time, all_start_times, all_end_times
+
+
+def populate_office_dropdown(shared_session: Session) -> list[str]:
     if shared_session is None:
         logging.error("Attempted to use shared_session before initialization.")
         messagebox.showerror("Error", "Application is not properly initialized. Please restart.")
@@ -106,9 +195,6 @@ def on_floor_select(
         messagebox.showerror("Error", "Application is not properly initialized. Please restart.")
         return
     try:
-        print(sector_dropdown)
-        print(desk_dropdown)
-        print(floor_dropdown)
         selected_office = office_dropdown.get()
         selected_floor = floor_dropdown.get()
 
@@ -219,6 +305,7 @@ def reset_sector_selection(
 
 
 def update_book_desk_button_text(
+        event: Any,
         shared_session: Session,
         sector_dropdown: Combobox,
         desk_dropdown: Combobox,

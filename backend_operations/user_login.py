@@ -27,7 +27,8 @@ def login(email: str, password: str, on_success_callback: Callable[[], None]) ->
     """
 
     if check_debug_mode():
-        set_current_user("app_dev")
+        debug_user = get_debug_user()
+        set_current_user(debug_user)
         logging.info(f"Debug mode is enabled, login is skipped, user set to: '{get_current_user()}'.")
         log_event("SYSTEM", "Success", "Login", f"Debug mode is enabled, login is skipped")
         on_success_callback()
@@ -75,6 +76,12 @@ def check_debug_mode() -> bool:
     load_dotenv("../.env")
     is_debug_mode = os.getenv("debug_mode")
     return is_debug_mode == "True"
+
+def get_debug_user() -> str:
+    """Return the debug user."""
+    load_dotenv("../.env")
+    debug_acc = os.getenv("debug_account")
+    return debug_acc
 
 
 def get_current_user() -> str:

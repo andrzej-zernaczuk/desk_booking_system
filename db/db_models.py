@@ -173,8 +173,8 @@ class Booking(Base):
     booking_id = Column(Integer, primary_key=True, autoincrement=True)
     user_name = Column(String, ForeignKey("users.user_name"), nullable=False)
     desk_code = Column(String, ForeignKey("desks.desk_code"), nullable=False)
-    start_date = Column(Date, nullable=False)
-    end_date = Column(Date, nullable=False)
+    start_date = Column(DateTime, nullable=False)
+    end_date = Column(DateTime, nullable=False)
     status_id = Column(Integer, ForeignKey("statuses.status_id"), nullable=False)
     created_at = Column(DateTime, nullable=False, server_default=func.now())
 

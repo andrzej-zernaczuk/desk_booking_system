@@ -1,13 +1,14 @@
 import logging
 import tkinter as tk
 from tkinter import ttk, messagebox
+from datetime import datetime, timedelta
 
 from db.sql_db import initialize_app_db
 from db.session_management import initialize_shared_session, close_shared_session
 from backend_operations.user_login import login
-# from backend_operations.bookings_backend import create_booking
+from backend_operations.bookings_backend import create_booking
 from gui_operations.gui_utils import show_frame, center_window, on_success
-from gui_operations.dropdowns_gui import populate_office_dropdown, on_office_select, on_floor_select, reset_sector_selection, update_book_desk_button_text
+from gui_operations.dropdowns_gui import calculate_time_intervals, populate_office_dropdown, on_office_select, on_floor_select, reset_sector_selection, update_book_desk_button_text
 
 
 def start_tkinter_app():
@@ -24,7 +25,7 @@ def start_tkinter_app():
     root = tk.Tk()
     root.title("Desk Booking System by Andrzej Zernaczuk")
     root.resizable(False, True)  # Disable resizing in width
-    root.minsize(width=1000, height=400)
+    root.minsize(width=1000, height=600)
     root.after(10, lambda: center_window(root))
     root.grid_rowconfigure(0, weight=1)
     root.grid_columnconfigure(0, weight=1)
@@ -32,20 +33,26 @@ def start_tkinter_app():
 
     # First Screen: Login Screen
     login_frame = tk.Frame(root)
+    login_frame.grid(row=0, column=0, sticky="nsew")
+    login_frame.grid_rowconfigure(0, weight=1)
+    login_frame.grid_rowconfigure(7, weight=1)
+    login_frame.grid_columnconfigure(0, weight=1)
+    login_frame.grid_columnconfigure(2, weight=1)
+
     instructions_label = tk.Label(login_frame, text="Please login:", font=("Arial", 24))
-    instructions_label.pack(pady=(50, 25))
+    instructions_label.grid(row=1, column=1, pady=(10, 20))
 
     # Email label and entry field
     email_label = tk.Label(login_frame, text="Email address:", font=("Arial", 16))
-    email_label.pack(pady=(10, 5))
+    email_label.grid(row=2, column=1, sticky="w", padx=10)
     email_entry = tk.Entry(login_frame, font=("Arial", 12), width=40)
-    email_entry.pack()
+    email_entry.grid(row=3, column=1, pady=5)
 
     # Password label and entry field
     password_label = tk.Label(login_frame, text="Password:", font=("Arial", 16))
-    password_label.pack(pady=(10, 5))
+    password_label.grid(row=4, column=1, sticky="w", padx=10)
     password_entry = tk.Entry(login_frame, font=("Arial", 12), width=40, show="*")  # `show="*"` masks the input
-    password_entry.pack()
+    password_entry.grid(row=5, column=1, pady=5)
 
     # Login button
     login_button = tk.Button(
@@ -60,7 +67,7 @@ def start_tkinter_app():
             )
         )
     )
-    login_button.pack(pady=(20, 0))
+    login_button.grid(row=6, column=1, pady=(20, 10))
     ################################################### DESK SELECTION ########################################################################
 
     # Second Screen: Desk Selection
@@ -85,31 +92,72 @@ def start_tkinter_app():
     image_label.grid(row=0, column=0, padx=20, pady=20, sticky="nsew")
 
 
+    # Date Selection
+    date_label = tk.Label(dropdowns_frame, text="Select booking date:", font=("Arial", 12))
+    date_label.grid(row=0, column=0, padx=10, pady=(10, 5), sticky="w")
+
+    date_dropdown = ttk.Combobox(dropdowns_frame, state="readonly")
+    date_dropdown.grid(row=1, column=0, padx=10, sticky="w")
+
+    # Populate the date dropdown with available dates (today + 6 days)
+    today = datetime.now()
+    available_dates = [(today + timedelta(days=i)).strftime("%Y-%m-%d") for i in range(7)]
+    date_dropdown['values'] = available_dates
+    date_dropdown.set(available_dates[0])  # Default to today's date
+
+    # debug set today to yesterday 23:45
+    if today.hour == 23 and today.minute >= 30:
+        # Update the date dropdown to the next day
+        next_date = (today + timedelta(days=1)).strftime("%Y-%m-%d")
+        date_dropdown.set(next_date)
+
+    # Time selection
+    suggested_start_time, suggested_end_time, possible_start_times, possible_end_times = calculate_time_intervals(date_dropdown.get())
+    # Start Time Dropdown
+    start_time_label = tk.Label(dropdowns_frame, text="Start Time:", font=("Arial", 12))
+    start_time_label.grid(row=2, column=0, padx=10, pady=5, sticky="w")
+
+    start_time_dropdown = ttk.Combobox(dropdowns_frame, state="readonly")
+    start_time_dropdown.grid(row=3, column=0, padx=10, pady=5, sticky="w")
+    start_time_dropdown["values"] = possible_start_times
+    start_time_dropdown.set(suggested_start_time)
+
+
+    # End Time Dropdown
+    end_time_label = tk.Label(dropdowns_frame, text="End Time:", font=("Arial", 12))
+    end_time_label.grid(row=4, column=0, padx=10, pady=5, sticky="w")
+
+    end_time_dropdown = ttk.Combobox(dropdowns_frame, state="readonly")
+    end_time_dropdown.grid(row=5, column=0, padx=10, pady=5, sticky="w")
+    end_time_dropdown["values"] = possible_end_times
+    end_time_dropdown.set(suggested_end_time)
+
+
     # Dropdown for Office
     office_label = tk.Label(dropdowns_frame, text="Select office:", font=("Arial", 12))
-    office_label.grid(row=0, column=0, padx=10, pady=(10, 5), sticky="w")
+    office_label.grid(row=6, column=0, padx=10, pady=(10, 5), sticky="w")
 
     office_dropdown = ttk.Combobox(dropdowns_frame, values=populate_office_dropdown(lambda: shared_session), state="readonly")
-    office_dropdown.grid(row=1, column=0, padx=10, sticky="w")
+    office_dropdown.grid(row=7, column=0, padx=10, sticky="w")
     office_dropdown.bind("<<ComboboxSelected>>", lambda event: on_office_select(event, shared_session, office_dropdown, floor_dropdown, sector_dropdown, desk_dropdown, book_desk_button))
 
 
     # Dropdown for Floor
     floor_label = tk.Label(dropdowns_frame, text="Select office floor:", font=("Arial", 12))
-    floor_label.grid(row=2, column=0, padx=10, pady=(10, 5), sticky="w")
+    floor_label.grid(row=8, column=0, padx=10, pady=(10, 5), sticky="w")
 
     floor_dropdown = ttk.Combobox(dropdowns_frame, state="disabled")
-    floor_dropdown.grid(row=3, column=0, padx=10, sticky="w")
+    floor_dropdown.grid(row=9, column=0, padx=10, sticky="w")
     floor_dropdown.bind("<<ComboboxSelected>>", lambda event: on_floor_select(event, shared_session, office_dropdown, floor_dropdown, sector_dropdown, desk_dropdown, book_desk_button, image_label))
 
 
     # Dropdown for Sector
     sector_label = tk.Label(dropdowns_frame, text="Select floor sector:", font=("Arial", 12))
-    sector_label.grid(row=4, column=0, padx=10, pady=(10, 5), sticky="w")
+    sector_label.grid(row=10, column=0, padx=10, pady=(10, 5), sticky="w")
 
     # Create a frame to hold the sector dropdown and reset button
     sector_frame = tk.Frame(dropdowns_frame)
-    sector_frame.grid(row=5, column=0, padx=10, sticky="w")
+    sector_frame.grid(row=11, column=0, padx=10, sticky="w")
 
     sector_dropdown = ttk.Combobox(sector_frame, state="disabled", width=20)
     sector_dropdown.grid(row=0, column=0, sticky="w")
@@ -121,17 +169,17 @@ def start_tkinter_app():
 
     # Dropdown for desk
     desk_label = tk.Label(dropdowns_frame, text="Select desk:", font=("Arial", 12))
-    desk_label.grid(row=6, column=0, padx=10, pady=(10, 5), sticky="w")
+    desk_label.grid(row=12, column=0, padx=10, pady=(10, 5), sticky="w")
 
     desk_dropdown = ttk.Combobox(dropdowns_frame, state="disabled")
-    desk_dropdown.grid(row=7, column=0, padx=10, sticky="w")
+    desk_dropdown.grid(row=13, column=0, padx=10, sticky="w")
     desk_dropdown.bind("<<ComboboxSelected>>", lambda event: update_book_desk_button_text(event, shared_session, sector_dropdown, desk_dropdown, book_desk_button))
 
 
     # Button for booking the desk
     book_desk_button = tk.Button(dropdowns_frame, text=f"Book desk {desk_dropdown.get()}", font=("Arial", 12), state="disabled")
-    book_desk_button.grid(row=8, column=0, padx=10, pady=30, sticky="w")
-    book_desk_button.bind("<Button-1>", lambda event: print("Book desk button clicked"))
+    book_desk_button.grid(row=14, column=0, padx=10, pady=30, sticky="w")
+    book_desk_button.bind("<Button-1>", lambda event: create_booking(event, lambda: shared_session, desk_dropdown.get(), date_dropdown.get(), start_time_dropdown.get(), end_time_dropdown.get()))
     book_desk_button.grid_remove()
 
     # Initially, show the login frame

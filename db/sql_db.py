@@ -1,6 +1,7 @@
 import os
 import logging
 from dotenv import load_dotenv
+import sqlalchemy
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, scoped_session, Session
 from google.cloud.sql.connector import Connector
@@ -73,12 +74,64 @@ def preload_data():
     finally:
         session_import.close()
 
+# PROJECT REQUIREMENT: triggers
+def create_trigger(engine):
+    """Create a trigger to prevent overlapping bookings."""
+    try:
+        with engine.connect() as connection:
+            # Begin transaction
+            trig_transaction = connection.begin()
+
+            try:
+                connection.execute(
+                    sqlalchemy.text("""
+                        CREATE OR REPLACE FUNCTION prevent_overlapping_bookings()
+                        RETURNS TRIGGER AS $$
+                        BEGIN
+                            -- Check if the user has an overlapping booking
+                            IF EXISTS (
+                                SELECT 1
+                                FROM bookings
+                                WHERE NEW.user_name = bookings.user_name
+                                AND NEW.start_date < bookings.end_date
+                                AND NEW.end_date > bookings.start_date
+                            ) THEN
+                                RAISE EXCEPTION 'Overlapping booking detected for user %', NEW.user_name;
+                            END IF;
+
+                            RETURN NEW;
+                        END;
+                        $$ LANGUAGE plpgsql;
+                    """)
+                )
+
+                # Create the trigger
+                connection.execute(
+                    sqlalchemy.text("""
+                        CREATE TRIGGER prevent_overlapping_bookings_trigger
+                        BEFORE INSERT OR UPDATE ON bookings
+                        FOR EACH ROW
+                        EXECUTE FUNCTION prevent_overlapping_bookings();
+                    """)
+                )
+
+                trig_transaction.commit()
+                logging.info("Trigger for preventing overlapping bookings created successfully.")
+            except Exception as exc:
+                trig_transaction.rollback()
+                logging.error(f"Error while creating trigger for overlapping bookings: {exc}")
+                exit()
+    except Exception as exc:
+        logging.error(f"Error while creating trigger for overlapping bookings: {exc}")
+        exit()
+
 
 def initialize_app_db():
     """Initialize the application by setting up the database."""
     try:
         create_tables()  # Create tables
         preload_data()   # Preload data
+        create_trigger(desk_booking_engine) # Create trigger
     except (Exception, ValueError) as error:
         logging.error(f"Error during database initialization: {error}")
         raise
