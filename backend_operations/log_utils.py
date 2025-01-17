@@ -1,6 +1,5 @@
 import logging
 from sqlalchemy.orm import Session
-from datetime import datetime, timezone
 
 from db.db_models import Log
 from db.sql_db import SessionFactory

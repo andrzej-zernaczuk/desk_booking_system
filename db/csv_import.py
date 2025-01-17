@@ -22,7 +22,7 @@ def if_table_populated(sql_session: Session, table: Table) -> bool:
     if sql_session.query(table).count() > 0:
         return True
     else:
-        False
+        return False
 
 
 def create_desk_code(sql_session: Session, desk_data: dict, file_name: str, line: int) -> None:
@@ -44,7 +44,9 @@ def create_desk_code(sql_session: Session, desk_data: dict, file_name: str, line
 
     # check if any of them are missing
     if any([not sector_id, not floor_id, not office_id]):
-        raise ValueError(f"Office ID, Floor ID and Sector ID are required for the desks table. Error in CSV {file_name} in line {line}")
+        raise ValueError(
+            f"Office ID, Floor ID and Sector ID are required for the desks table. Error in CSV {file_name} in line {line}"
+        )
 
     sector_name = sql_session.execute(
         select(Sector.sector_name).where(Sector.sector_id == int(sector_id))
@@ -64,44 +66,45 @@ def create_desk_code(sql_session: Session, desk_data: dict, file_name: str, line
         raise ValueError(f"Sector with ID {sector_id} not found in the database.")
 
 
-def import_table_data(sql_session: Session, table: Table, file_name: str, field_names: list) -> None:
+def import_table_data(sql_session: Session, table_model, file_name: str, field_names: list) -> None:
     """
-    Import rows from csv file into table in database.
+    Import rows from CSV file into table in the database.
 
     Args:
-        table (Table): Table to import data into
-        file_name (str): name of csv file
-        field_names (list): list of field names
-        session (_type_): current session object
+        sql_session (Session): SQLAlchemy session object
+        table_model: SQLAlchemy ORM model to import data into
+        file_name (str): Name of the CSV file
+        field_names (list): List of field names
 
     Returns:
         None
     """
-    if not if_table_populated(sql_session, table):
+    if not if_table_populated(sql_session, table_model):
         try:
             with open(file_name, "r") as file:
                 csv_file = reader(file, skipinitialspace=True)
-                header = next(csv_file)
+                header = next(csv_file)  # Skip the header row
 
                 for line in csv_file:
                     record_data = {field_name: line[i] for i, field_name in enumerate(field_names)}
 
-                    # if desks are being imported generate desk_code for each desk
-                    if table.__tablename__ == "desks":
+                    # If desks are being imported, generate desk_code for each desk
+                    if table_model.__tablename__ == "desks":
                         create_desk_code(sql_session, record_data, file_name, csv_file.line_num)
 
-                    record = table(**record_data)
-                    sql_session.add(record)
+                    # Create a new instance of the model
+                    record_instance = table_model(**record_data)
+                    sql_session.add(record_instance)
 
             sql_session.commit()
-            logging.info(f"Succesfully inserted rows into '{table.__tablename__}' table")
+            logging.info(f"Successfully inserted rows into '{table_model.__tablename__}' table")
         except Exception:
             sql_session.rollback()
             exc_type, exc_value, exc_tb = sys.exc_info()
             traceback_details = traceback.format_exception(exc_type, exc_value, exc_tb)
-            logging.error(f"Error when inserting data into '{table.__tablename__}' table: {''.join(traceback_details)}")
+            logging.error(
+                f"Error when inserting data into '{table_model.__tablename__}' table: {''.join(traceback_details)}"
+            )
             raise
-        finally:
-            sql_session.close()
     else:
-        logging.info(f"'{table.__tablename__}' table is already populated")
+        logging.info(f"'{table_model.__tablename__}' table is already populated")

@@ -23,12 +23,30 @@ def managed_session(session_factory: Callable[[], Session]) -> Generator[Session
         yield session
     except Exception as exc:
         logging.error(f"Session error: {exc}")
-        log_event(get_current_user(), "Failure", "DB connection", f"Exception occured while creating managed session: {exc}")
+
+        log_event(
+            get_current_user(), "Failure", "DB connection", f"Exception occured while creating managed session: {exc}"
+        )
         raise
     finally:
-        if 'session' in locals() and session is not None:
+        if "session" in locals() and session is not None:
             session.close()
 
+
+def safe_session_factory(shared_session: Session) -> Callable[[], Session]:
+    """
+    Wrap a shared session to ensure it always returns a valid session or raises an exception.
+
+    :param shared_session: The shared SQLAlchemy session.
+    :return: A callable that returns the session.
+    """
+
+    def factory() -> Session:
+        if shared_session is None:
+            raise RuntimeError("Shared session is not initialized.")
+        return shared_session
+
+    return factory
 
 
 def initialize_shared_session():

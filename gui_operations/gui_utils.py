@@ -1,7 +1,12 @@
-import tkinter as tk
+from tkinter import Tk, Frame, Label, Button
+from typing import Callable
+from sqlalchemy.orm import Session
 from screeninfo import get_monitors
 
-def show_frame(frame: tk.Frame, all_frames: list[tk.Frame]):
+from gui_operations.bookings_gui import initialize_booking_info
+
+
+def show_frame(frame: Frame, all_frames: list[Frame]):
     """Show a frame and hide all other frames.
 
     :param frame: The frame to show
@@ -18,16 +23,35 @@ def show_frame(frame: tk.Frame, all_frames: list[tk.Frame]):
     frame.update_idletasks()
 
 
-def on_success(frame_to_be_shown: tk.Frame, all_frames: list[tk.Frame]):
+def on_login_success(
+    session_factory: Callable[[], Session],
+    booking_details_label: Label,
+    check_in_button: Button,
+    cancel_button: Button,
+    desk_selecton_frame: Frame,
+    bookings_frame: Frame,
+    booking_info_frame: Frame,
+    floor_image_frame: Frame,
+    all_frames: list[Frame],
+):
     """Callback to transition to the success frame.
 
-    :param frame_to_be_shown: The frame to be shown
+    :param desk_selecton_frame: The frame to be shown
     :param all_frames: A list of all frames
     """
-    show_frame(frame_to_be_shown, all_frames)
+    show_frame(desk_selecton_frame, all_frames)
+    initialize_booking_info(
+        session_factory,
+        booking_details_label,
+        check_in_button,
+        cancel_button,
+        bookings_frame,
+        booking_info_frame,
+        floor_image_frame,
+    )
 
 
-def center_window(window: tk.Tk):
+def center_window(window: Tk):
     """Center the window on the screen.
 
     :param window: The window to center
@@ -53,4 +77,4 @@ def center_window(window: tk.Tk):
     y = monitor_y + (screen_height // 2) - (window_height // 2)
 
     # Set the geometry of the window (position only, no size)
-    window.geometry(f'+{x}+{y}')
+    window.geometry(f"+{x}+{y}")

@@ -17,10 +17,15 @@ def get_available_offices(session_factory: Callable[[], Session]) -> list[str]:
         with managed_session(session_factory) as session:
             stmt = select(Office.office_name)
             offices = session.execute(stmt).scalars().all()
-        return offices
+        return list(offices)
     except Exception as exc:
         logging.error(f"Error fetching available offices: {exc}")
-        log_event(get_current_user(), "Failure", "Desk selection", f"Exception occured while fetching available offices: {exc}")
+        log_event(
+            get_current_user(),
+            "Failure",
+            "Desk selection",
+            f"Exception occured while fetching available offices: {exc}",
+        )
         return []
 
 
@@ -37,10 +42,15 @@ def get_floors_in_office(session_factory: Callable[[], Session], office_name: st
                 .where(Office.office_name == office_name)
             )
             floors = session.execute(stmt).scalars().all()
-        return floors
+        return list(floors)
     except Exception as exc:
         logging.error(f"Error fetching floors for office '{office_name}': {exc}")
-        log_event(get_current_user(), "Failure", "Desk selection", f"Exception occured while fetching available office floors: {exc}")
+        log_event(
+            get_current_user(),
+            "Failure",
+            "Desk selection",
+            f"Exception occured while fetching available office floors: {exc}",
+        )
         return []
 
 
@@ -57,14 +67,21 @@ def get_sectors_on_floor(session_factory: Callable[[], Session], floor_name: str
                 .where(Floor.floor_name == floor_name)
             )
             sectors = session.execute(stmt).scalars().all()
-        return sectors
+        return list(sectors)
     except Exception as exc:
         logging.error(f"Error fetching sectors for floor '{floor_name}': {exc}")
-        log_event(get_current_user(), "Failure", "Desk selection", f"Exception occured while fetching available floor sectors: {exc}")
+        log_event(
+            get_current_user(),
+            "Failure",
+            "Desk selection",
+            f"Exception occured while fetching available floor sectors: {exc}",
+        )
         return []
 
 
-def get_desks_on_floor(session_factory: Callable[[], Session], floor_name: str, sector_name: Optional[str]) -> list[str]:
+def get_desks_on_floor(
+    session_factory: Callable[[], Session], floor_name: str, sector_name: Optional[str]
+) -> list[str]:
     """Fetch desks for a specific floor.
 
     :param session_factory: A callable that returns a SQLAlchemy session
@@ -79,19 +96,18 @@ def get_desks_on_floor(session_factory: Callable[[], Session], floor_name: str, 
 
             # If sector_name is provided, add a filter for the sector
             if sector_name:
-                stmt = (
-                    stmt.join(Sector, Sector.sector_id == Desk.sector_id)
-                    .where(Sector.sector_name == sector_name)
-                )
+                stmt = stmt.join(Sector, Sector.sector_id == Desk.sector_id).where(Sector.sector_name == sector_name)
             desks = session.execute(stmt).scalars().all()
-        return desks
+        return list(desks)
     except Exception as exc:
         logging.error(f"Error fetching desks for floor '{floor_name}' and sector '{sector_name}': {exc}")
-        log_event(get_current_user(), "Failure", "Desk selection", f"Exception occured while fetching available desks: {exc}")
+        log_event(
+            get_current_user(), "Failure", "Desk selection", f"Exception occured while fetching available desks: {exc}"
+        )
         return []
 
 
-def get_desk_sector(session_factory: Callable[[], Session], desk_code: str) -> str:
+def get_desk_sector(session_factory: Callable[[], Session], desk_code: str) -> str | None:
     """Fetch the sector for a given desk.
 
     :param session_factory: A callable that returns a SQLAlchemy session
@@ -108,5 +124,7 @@ def get_desk_sector(session_factory: Callable[[], Session], desk_code: str) -> s
         return sector
     except Exception as exc:
         logging.error(f"Error fetching sector for desk '{desk_code}': {exc}")
-        log_event(get_current_user(), "Failure", "Desk selection", f"Exception occured while fetching desk sector: {exc}")
+        log_event(
+            get_current_user(), "Failure", "Desk selection", f"Exception occured while fetching desk sector: {exc}"
+        )
         return None

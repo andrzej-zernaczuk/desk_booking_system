@@ -1,21 +1,9 @@
-from datetime import datetime, timezone
-from sqlalchemy import (
-    Column,
-    String,
-    Integer,
-    DateTime,
-    Date,
-    ForeignKey,
-    UniqueConstraint,
-    Index
-)
-from sqlalchemy.orm import (
-    declarative_base,
-    relationship
-)
 from sqlalchemy.sql import func
+from sqlalchemy.orm import declarative_base, relationship
+from sqlalchemy import Column, String, Integer, DateTime, ForeignKey, UniqueConstraint, Index
 
 Base = declarative_base()
+
 
 class Role(Base):
     __tablename__ = "roles"
@@ -40,8 +28,7 @@ class Department(Base):
     users = relationship("User", back_populates="department")
 
     def __repr__(self):
-        return (f"<Department(department_id={self.department_id}, "
-                f"department_name='{self.department_name}')>")
+        return f"<Department(department_id={self.department_id}, " f"department_name='{self.department_name}')>"
 
 
 class User(Base):
@@ -60,8 +47,10 @@ class User(Base):
     bookings = relationship("Booking", back_populates="user")
 
     def __repr__(self):
-        return (f"<User(user_id={self.user_id}, user_name='{self.user_name}', "
-                f"role_id={self.role_id}, department_id={self.department_id})>")
+        return (
+            f"<User(user_id={self.user_id}, user_name='{self.user_name}', "
+            f"role_id={self.role_id}, department_id={self.department_id})>"
+        )
 
 
 class Office(Base):
@@ -92,13 +81,11 @@ class Floor(Base):
 
     # PROJECT REQUIREMENT: indexes
     # Indexes
-    __table_args__ = (
-        Index("idx_floors_office_floor_name", "office_id", "floor_name"),
-    )
+    __table_args__ = (Index("idx_floors_office_floor_name", "office_id", "floor_name"),)
 
     def __repr__(self):
-        return (f"<Floor(floor_id={self.floor_id}, floor_name='{self.floor_name}', "
-                f"office_id={self.office_id})>")
+        return f"<Floor(floor_id={self.floor_id}, floor_name='{self.floor_name}', " f"office_id={self.office_id})>"
+
 
 class Sector(Base):
     __tablename__ = "sectors"
@@ -108,22 +95,18 @@ class Sector(Base):
     sector_name = Column(String, nullable=False)
 
     # Composite unique constraint: sector_name + floor_id
-    __table_args__ = (
-        UniqueConstraint("floor_id", "sector_name", name="uq_floor_sector_name"),
-    )
+    __table_args__ = (UniqueConstraint("floor_id", "sector_name", name="uq_floor_sector_name"),)
 
     # Relationships
     floor = relationship("Floor", back_populates="sectors")
     desks = relationship("Desk", back_populates="sector")
 
     # Indexes
-    __table_args__ = (
-        Index("idx_sectors_floor_sector_name", "floor_id", "sector_name"),
-    )
+    __table_args__ = (Index("idx_sectors_floor_sector_name", "floor_id", "sector_name"),)
 
     def __repr__(self):
-        return (f"<Sector(sector_id={self.sector_id}, sector_name='{self.sector_name}', "
-                f"floor_id={self.floor_id})>")
+        return f"<Sector(sector_id={self.sector_id}, sector_name='{self.sector_name}', " f"floor_id={self.floor_id})>"
+
 
 class Desk(Base):
     __tablename__ = "desks"
@@ -143,14 +126,14 @@ class Desk(Base):
     bookings = relationship("Booking", back_populates="desk")
 
     # Indexes
-    __table_args__ = (
-        Index("idx_desks_office_floor_sector", "office_id", "floor_id", "sector_id"),
-    )
+    __table_args__ = (Index("idx_desks_office_floor_sector", "office_id", "floor_id", "sector_id"),)
 
     def __repr__(self):
-        return (f"<Desk(desk_id={self.desk_id}, desk_code='{self.desk_code}', "
-                f"office_id={self.office_id}, floor_id={self.floor_id}, "
-                f"sector_id={self.sector_id}, local_id={self.local_id})>")
+        return (
+            f"<Desk(desk_id={self.desk_id}, desk_code='{self.desk_code}', "
+            f"office_id={self.office_id}, floor_id={self.floor_id}, "
+            f"sector_id={self.sector_id}, local_id={self.local_id})>"
+        )
 
 
 class Status(Base):
@@ -163,8 +146,7 @@ class Status(Base):
     bookings = relationship("Booking", back_populates="status")
 
     def __repr__(self):
-        return (f"<Status(status_id={self.status_id}, "
-                f"status_name='{self.status_name}')>")
+        return f"<Status(status_id={self.status_id}, " f"status_name='{self.status_name}')>"
 
 
 class Booking(Base):
@@ -190,9 +172,11 @@ class Booking(Base):
     )
 
     def __repr__(self):
-        return (f"<Booking(booking_id={self.booking_id}, user_name={self.user_name}, "
-                f"desk_code='{self.desk_code}', status_id={self.status_id}, "
-                f"start_date={self.start_date}, end_date={self.end_date})>")
+        return (
+            f"<Booking(booking_id={self.booking_id}, user_name={self.user_name}, "
+            f"desk_code='{self.desk_code}', status_id={self.status_id}, "
+            f"start_date={self.start_date}, end_date={self.end_date})>"
+        )
 
 
 class Log(Base):
@@ -206,10 +190,10 @@ class Log(Base):
     created_at = Column(DateTime, nullable=False, server_default=func.now())
 
     # Indexes
-    __table_args__ = (
-        Index("idx_logs_user_created_at", "user_name", "created_at"),
-    )
+    __table_args__ = (Index("idx_logs_user_created_at", "user_name", "created_at"),)
 
     def __repr__(self):
-        return (f"<Log(log_id={self.log_id}, user_name={self.user_name}, "
-                f"event_type='{self.event_type}', event_description='{self.event_description}', created_at={self.created_at})>")
+        return (
+            f"<Log(log_id={self.log_id}, user_name={self.user_name}, "
+            f"event_type='{self.event_type}', event_description='{self.event_description}', created_at={self.created_at})>"
+        )

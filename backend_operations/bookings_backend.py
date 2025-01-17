@@ -1,8 +1,10 @@
 import logging
-from typing import Callable, Any
+import sqlalchemy
+from typing import Callable
 from datetime import datetime
 from sqlalchemy.sql import select
 from sqlalchemy.orm import Session
+from tkinter import messagebox, Event, Frame
 
 from db.db_models import Desk, Booking, Status
 from db.session_management import managed_session
@@ -11,13 +13,13 @@ from backend_operations.user_login import get_current_user
 
 
 def create_booking(
-        event: Any,
-        session_factory: Callable[[], Session],
-        desk_code: str,
-        selected_date: str,
-        start_time: str,
-        end_time: str
-    ):
+    event: Event,
+    session_factory: Callable[[], Session],
+    desk_code: str,
+    selected_date: str,
+    start_time: str,
+    end_time: str,
+):
     """Create Booking for logged in user.
 
     :param session_factory: A callable that returns a SQLAlchemy session
@@ -43,9 +45,7 @@ def create_booking(
                 raise ValueError("No user is currently logged in.")
 
             # Check if the desk exists
-            desk_exists = session.execute(
-                select(Desk).where(Desk.desk_code == desk_code)
-            ).scalar_one_or_none()
+            desk_exists = session.execute(select(Desk).where(Desk.desk_code == desk_code)).scalar_one_or_none()
 
             if not desk_exists:
                 raise ValueError(f"Desk '{desk_code}' does not exist.")
@@ -55,17 +55,26 @@ def create_booking(
                 select(Status.status_id).where(Status.status_name == "Pending")
             ).scalar_one_or_none()
 
-            if not pending_status:
+            canceled_status = session.execute(
+                select(Status).where(Status.status_name == "Canceled")
+            ).scalar_one_or_none()
+
+            if not pending_status or not canceled_status:
                 raise ValueError("The 'Pending' status does not exist in the database.")
 
             # Check for overlapping bookings
-            overlapping_bookings = session.execute(
-                select(Booking).where(
-                    Booking.desk_code == desk_code,
-                    Booking.start_date < end_time_dt,
-                    Booking.end_date > start_time_dt
+            overlapping_bookings = (
+                session.execute(
+                    select(Booking).where(
+                        Booking.desk_code == desk_code,
+                        Booking.start_date < end_time_dt,
+                        Booking.end_date > start_time_dt,
+                        Booking.status_id != canceled_status.status_id,
+                    )
                 )
-            ).scalars().all()
+                .scalars()
+                .all()
+            )
 
             if overlapping_bookings:
                 raise ValueError(f"The desk '{desk_code}' is already booked for the selected time range.")
@@ -76,28 +85,215 @@ def create_booking(
                 desk_code=desk_code,
                 start_date=start_time_dt,
                 end_date=end_time_dt,
-                status_id=pending_status
+                status_id=pending_status,
             )
 
             session.add(new_booking)
             session.commit()
 
             # Log the successful booking creation
-            logging.info(f"Booking created successfully for desk '{desk_code}' from '{start_time_dt}' to '{end_time_dt}' by user '{current_user}'.")
+            logging.info(
+                f"Booking created successfully for desk '{desk_code}' from '{start_time_dt}' to '{end_time_dt}' by user '{current_user}'."
+            )
             log_event(
                 current_user,
                 "Success",
                 "Booking",
-                f"Booking created successfully for desk '{desk_code}' from '{start_time_dt}' to '{end_time_dt}'"
+                f"Booking created successfully for desk '{desk_code}' from '{start_time_dt}' to '{end_time_dt}'",
+            )
+            # Notify the user of success
+            messagebox.showinfo(
+                title="Booking Successful",
+                message=f"Booking created successfully for desk '{desk_code}' from {start_time} to {end_time}.",
             )
 
+    except sqlalchemy.exc.DatabaseError as db_err:
+        # Detect overlapping booking error
+        if "Overlapping booking detected" in str(db_err):
+            logging.warning(f"User '{get_current_user()}' attempted an overlapping booking.")
+            log_event(
+                get_current_user(),
+                "Failure",
+                "Booking",
+                f"User attempted an overlapping booking for desk '{desk_code}' from '{start_time_dt}' to '{end_time_dt}'",
+            )
+            messagebox.showwarning(
+                title="Booking Error",
+                message=f"You already have a booking during this time. Please select a different time slot.",
+            )
+        else:
+            logging.error(f"Database error while creating booking: {db_err}")
+            log_event(
+                get_current_user(),
+                "Failure",
+                "Booking",
+                f"Database error while creating booking for desk '{desk_code}' from '{start_time_dt}' to '{end_time_dt}'",
+            )
+            messagebox.showerror(
+                title="Database Error", message="An unexpected database error occurred. Please try again later."
+            )
+        raise
+
     except ValueError as val_err:
-        # Handle user-input errors (e.g., invalid desk or time range)
-        logging.error(f"Error while creating booking for '{desk_code}' with start time: '{start_time}' and end time: '{end_time}' for user: '{get_current_user()}': {val_err}")
-        log_event(get_current_user(), "Failure", "Booking", f"Booking creation failed for '{desk_code}' with start time: '{start_time}' and end time: '{end_time}': {val_err}")
+        # Handle user-input errors
+        logging.error(f"Error while creating booking: {val_err}")
+        log_event(
+            get_current_user(),
+            "Failure",
+            "Booking",
+            f"Error while creating booking for desk '{desk_code}' from '{start_time_dt}' to '{end_time_dt}': {val_err}",
+        )
+        messagebox.showerror(title="Input Error", message=f"Booking creation failed: {val_err}")
         raise
 
     except Exception as exc:
-        logging.error(f"Error while creating booking for '{desk_code}' with start time: '{start_time}' and end time: '{end_time}' for user: '{get_current_user()}': {exc}")
-        log_event(get_current_user(), "Failure", "Booking", f"Booking creation failed for '{desk_code}' with start time: '{start_time}' and end time: '{end_time}': {exc}")
+        # Handle unexpected errors
+        logging.error(f"Unexpected error while creating booking: {exc}")
+        log_event(
+            get_current_user(),
+            "Failure",
+            "Booking",
+            f"Unexpected error while creating booking for desk '{desk_code}' from '{start_time_dt}' to '{end_time_dt}': {exc}",
+        )
+        messagebox.showerror(title="Error", message="An unexpected error occurred. Please try again later.")
         raise
+
+
+# Function to check if the user has an active or next pending reservation
+def check_user_current_or_next_booking(session_factory: Callable[[], Session]) -> dict | None:
+    """Check if the user has an active or pending booking.
+
+    param: session_factory: A callable that returns a SQLAlchemy session
+    """
+    try:
+        user = get_current_user()
+
+        with managed_session(session_factory) as session:
+            # Fetch "Active" and "Pending" statuses
+            active_status = session.execute(select(Status).where(Status.status_name == "Active")).scalar_one_or_none()
+            pending_status = session.execute(
+                select(Status).where(Status.status_name == "Pending")
+            ).scalar_one_or_none()
+            if not active_status or not pending_status:
+                raise ValueError("Required statuses ('Active' and 'Pending') not found in the database.")
+
+            # Query for an active booking first
+            active_booking = session.execute(
+                select(Booking)
+                .where(
+                    Booking.user_name == user,
+                    Booking.status_id == active_status.status_id,
+                    Booking.start_date <= datetime.now(),
+                    Booking.end_date >= datetime.now(),
+                )
+                .order_by(Booking.start_date)
+            ).scalar_one_or_none()
+
+            if active_booking:
+                return {
+                    "booking_id": active_booking.booking_id,
+                    "desk_code": active_booking.desk_code,
+                    "start_time": active_booking.start_date.strftime("%Y-%m-%d %H:%M"),
+                    "end_time": active_booking.end_date.strftime("%Y-%m-%d %H:%M"),
+                    "status": active_status.status_name,
+                }
+
+            # If no active booking, query the next pending booking
+            next_pending_booking = (
+                session.execute(
+                    select(Booking)
+                    .where(
+                        Booking.user_name == user,
+                        Booking.status_id == pending_status.status_id,
+                        Booking.start_date > datetime.now(),
+                    )
+                    .order_by(Booking.start_date)
+                )
+                .scalars()
+                .first()
+            )
+
+            if next_pending_booking:
+                return {
+                    "booking_id": next_pending_booking.booking_id,
+                    "desk_code": next_pending_booking.desk_code,
+                    "start_time": next_pending_booking.start_date.strftime("%Y-%m-%d %H:%M"),
+                    "end_time": next_pending_booking.end_date.strftime("%Y-%m-%d %H:%M"),
+                    "status": pending_status.status_name,
+                }
+
+            # If neither active nor pending bookings are found, return None
+            return None
+    except Exception as exc:
+        logging.error(f"Error while fetching user booking: {exc}")
+        log_event(get_current_user(), "Failure", "Booking", f"Error while fetching next user booking: {exc}")
+        messagebox.showerror(
+            title="Error",
+            message="An unexpected error occurred while fetching your booking. Please try again later.",
+        )
+        return None
+
+
+def check_in_booking(session_factory: Callable[[], Session], booking_id: int) -> bool:
+    """Mark a booking as 'Active' by updating its status."""
+    try:
+        user = get_current_user()
+
+        with managed_session(session_factory) as session:
+            # Get the status for "Active"
+            active_status = session.execute(select(Status).where(Status.status_name == "Active")).scalar_one_or_none()
+            if not active_status:
+                raise ValueError("Active status not found in the database.")
+
+            # Ensure the booking matches the provided booking_id
+            booking = session.execute(select(Booking).where(Booking.booking_id == booking_id)).scalar_one_or_none()
+            if not booking:
+                raise ValueError("No valid booking found for check-in.")
+
+            # Update booking status to Active
+            booking.status_id = active_status.status_id
+            session.commit()
+
+            # Log the successful check-in
+            logging.info(f"User '{user}' successfully checked in for booking {booking_id}.")
+            log_event(
+                user,
+                "Success",
+                "Check-in",
+                f"User successfully checked in for booking ID: {booking_id}",
+            )
+            return True
+    except Exception as exc:
+        logging.error(f"Error during check-in for booking ID {booking_id}: {exc}")
+        log_event(
+            get_current_user(),
+            "Failure",
+            "Check-in",
+            f"Error during check-in for booking ID {booking_id}: {exc}",
+        )
+        return False
+
+
+def cancel_booking(session_factory: Callable[[], Session], booking_id: int) -> bool:
+    """Cancel a booking by updating its status to 'Canceled'."""
+    try:
+        with managed_session(session_factory) as session:
+            canceled_status = session.execute(
+                select(Status).where(Status.status_name == "Canceled")
+            ).scalar_one_or_none()
+            if not canceled_status:
+                raise ValueError("Canceled status not found in the database.")
+
+            # Fetch the booking
+            booking = session.execute(select(Booking).where(Booking.booking_id == booking_id)).scalar_one_or_none()
+            if not booking:
+                raise ValueError("Booking not found to cancel.")
+
+            # Update status
+            booking.status_id = canceled_status.status_id
+            session.commit()
+            logging.info(f"Booking {booking_id} successfully canceled.")
+            return True
+    except Exception as exc:
+        logging.error(f"Error during booking cancellation: {exc}")
+        return False
