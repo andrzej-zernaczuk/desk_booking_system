@@ -4,7 +4,6 @@ from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 from tkinter import Button, Frame, Label, messagebox
 
-from backend_operations.log_utils import log_event
 from backend_operations.bookings_backend import check_user_current_or_next_booking, check_in_booking, cancel_booking
 from backend_operations.user_login import get_current_user
 
@@ -15,7 +14,10 @@ def update_button_states(booking: dict, check_in_button: Button):
     booking_start = datetime.strptime(booking["start_time"], "%Y-%m-%d %H:%M")
 
     # Enable 'Check In' button 15 minutes before start and up to 30 minutes after start
-    if booking_start - timedelta(minutes=15) <= current_time <= booking_start + timedelta(minutes=30):
+    if (
+        booking_start - timedelta(minutes=15) <= current_time <= booking_start + timedelta(minutes=30)
+        and not booking["status"] == "Active"
+    ):
         check_in_button.config(state="normal")
     else:
         check_in_button.config(state="disabled")

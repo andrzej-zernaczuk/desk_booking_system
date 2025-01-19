@@ -6,6 +6,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, scoped_session, Session
 from google.cloud.sql.connector import Connector
 
+from backend_operations.utils import get_time_change
 from db.csv_import import import_table_data
 from db.db_models import Base, Role, Department, Status, Office, Floor, Sector, Desk
 
@@ -148,7 +149,7 @@ def create_trigger(engine):
                         BEFORE INSERT OR UPDATE ON bookings
                         FOR EACH ROW
                         EXECUTE FUNCTION prevent_overlapping_bookings();
-                    """
+                        """
                     )
                 )
 
@@ -163,12 +164,134 @@ def create_trigger(engine):
         exit()
 
 
+def initialize_pg_cron(engine):
+    """Initialize the scheduled booking status updates using pg_cron."""
+    try:
+        # Check if pg_cron extension is installed
+        with engine.connect() as connection:
+            # Begin transaction
+            pg_cron_transaction = connection.begin()
+
+            try:
+                result = connection.execute(
+                    sqlalchemy.text(
+                        """
+                        SELECT 1
+                        FROM pg_extension
+                        WHERE extname = 'pg_cron';
+                        """
+                    )
+                ).scalar()
+
+                if not result:
+                    logging.error("pg_cron extension is not installed. Please install it to use this feature.")
+                    exit()
+
+                # Get current time offset from UTC for Poland
+                time_change = get_time_change()
+                # Create the function to update booking statuses
+                connection.execute(
+                    sqlalchemy.text(
+                        f"""
+                        CREATE OR REPLACE FUNCTION update_booking_statuses()
+                        RETURNS void LANGUAGE plpgsql AS $$
+                        BEGIN
+                            -- Cancel bookings that were not checked in within 30 minutes of the start time
+                            UPDATE bookings
+                            SET status_id = (SELECT status_id FROM statuses WHERE status_name = 'Canceled')
+                            WHERE status_id = (SELECT status_id FROM statuses WHERE status_name = 'Pending')
+                            AND (start_date + INTERVAL '30 minutes') < (NOW() + INTERVAL '{time_change} hour');
+
+                            -- Cancel bookings if the end time has passed and they are still pending
+                            UPDATE bookings
+                            SET status_id = (SELECT status_id FROM statuses WHERE status_name = 'Canceled')
+                            WHERE status_id = (SELECT status_id FROM statuses WHERE status_name = 'Pending')
+                            AND end_date < (NOW() + INTERVAL '{time_change} hour');
+
+                            -- Complete bookings whose end time has passed
+                            UPDATE bookings
+                            SET status_id = (SELECT status_id FROM statuses WHERE status_name = 'Completed')
+                            WHERE status_id = (SELECT status_id FROM statuses WHERE status_name = 'Active')
+                            AND end_date < (NOW() + INTERVAL '{time_change} hour');
+                        END;
+                        $$;
+                        """
+                    )
+                )
+
+                # Schedule the function to run every minute
+                connection.execute(
+                    sqlalchemy.text(
+                        """
+                        SELECT cron.schedule('update_booking_statuses', '*/1 * * * *', 'SELECT update_booking_statuses();');
+                        """
+                    )
+                )
+                pg_cron_transaction.commit()
+                logging.info("Cron job for booking status updates created successfully.")
+            except Exception as exc:
+                pg_cron_transaction.rollback()
+                logging.error(f"Error while creating cron job for booking status updates: {exc}")
+                exit()
+    except:
+        logging.error("Error while initializing pg_cron.")
+        exit()
+
+
+# PROJECT REQUIREMENT: views
+def create_most_frequent_users_view(engine):
+    """
+    Create the most_frequent_users view in the database.
+    This view calculates the user with the most reservations and their reservation count.
+
+    :param engine: SQLAlchemy engine connected to the database.
+    """
+    try:
+        with engine.connect() as connection:
+            # Begin transaction
+            transaction = connection.begin()
+
+            try:
+                connection.execute(sqlalchemy.text("DROP TABLE IF EXISTS most_frequent_users;"))
+                connection.execute(sqlalchemy.text("DROP VIEW IF EXISTS most_frequent_users;"))
+                connection.execute(
+                    sqlalchemy.text(
+                        """
+                        CREATE OR REPLACE VIEW most_frequent_users AS
+                        SELECT
+                            users.user_name,
+                            COUNT(bookings.booking_id) AS reservation_count
+                        FROM
+                            users
+                        JOIN
+                            bookings ON users.user_name = bookings.user_name
+                        GROUP BY
+                            users.user_name
+                        ORDER BY
+                            reservation_count DESC;
+                        """
+                    )
+                )
+
+                transaction.commit()
+                logging.info("View 'most_frequent_users' created successfully.")
+            except Exception as exc:
+                transaction.rollback()
+                logging.error(f"Error while creating 'most_frequent_users' view: {exc}")
+                raise
+    except Exception as exc:
+        logging.error(f"Failed to create view 'most_frequent_users': {exc}")
+        raise
+
+
 def initialize_app_db():
     """Initialize the application by setting up the database."""
     try:
         create_tables()  # Create tables
         preload_data()  # Preload data
-        create_trigger(desk_booking_engine)  # Create trigger
+        create_trigger(desk_booking_engine)
+        initialize_pg_cron(desk_booking_engine)
+        create_most_frequent_users_view(desk_booking_engine)
     except (Exception, ValueError) as error:
         logging.error(f"Error during database initialization: {error}")
         raise

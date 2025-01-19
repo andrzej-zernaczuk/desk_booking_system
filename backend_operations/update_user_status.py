@@ -1,1 +1,0 @@
-# Placeholder for function that updates user status (Online/Offline) in the database. Used to keep track of user activity.

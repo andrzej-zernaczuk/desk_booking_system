@@ -2,11 +2,11 @@ import logging
 import sqlalchemy
 from typing import Callable
 from datetime import datetime
-from sqlalchemy.sql import select
+from sqlalchemy.sql import select, func, desc
 from sqlalchemy.orm import Session
-from tkinter import messagebox, Event, Frame
+from tkinter import messagebox, Event
 
-from db.db_models import Desk, Booking, Status
+from db.db_models import Booking, Office, Floor, Desk, Status, MostFrequentUser
 from db.session_management import managed_session
 from backend_operations.log_utils import log_event
 from backend_operations.user_login import get_current_user
@@ -183,8 +183,6 @@ def check_user_current_or_next_booking(session_factory: Callable[[], Session]) -
                 .where(
                     Booking.user_name == user,
                     Booking.status_id == active_status.status_id,
-                    Booking.start_date <= datetime.now(),
-                    Booking.end_date >= datetime.now(),
                 )
                 .order_by(Booking.start_date)
             ).scalar_one_or_none()
@@ -198,13 +196,15 @@ def check_user_current_or_next_booking(session_factory: Callable[[], Session]) -
                     "status": active_status.status_name,
                 }
 
+            # PROJECT REQUIREMENT: subquery
             # If no active booking, query the next pending booking
             next_pending_booking = (
                 session.execute(
                     select(Booking)
                     .where(
                         Booking.user_name == user,
-                        Booking.status_id == pending_status.status_id,
+                        Booking.status_id  # == pending_status.status_id,
+                        == (select(Status.status_id).where(Status.status_name == "Pending")).scalar_subquery(),
                         Booking.start_date > datetime.now(),
                     )
                     .order_by(Booking.start_date)
@@ -297,3 +297,76 @@ def cancel_booking(session_factory: Callable[[], Session], booking_id: int) -> b
     except Exception as exc:
         logging.error(f"Error during booking cancellation: {exc}")
         return False
+
+
+# PROJECT REQUIREMENT: complex query
+def get_most_reserved_desk(event: Event, session_factory: Callable[[], Session]):
+    """
+    Query the database to find the most reserved desk with additional location details.
+
+    :param event: The event that triggered the function
+    :param session_factory: A callable that returns a SQLAlchemy session
+    :return: A dictionary containing desk details, location details, and reservation count
+    """
+    try:
+        with managed_session(session_factory) as session:
+            stmt = (
+                select(
+                    Desk.desk_code,
+                    Desk.local_id.label("desk_code"),
+                    Floor.floor_name,
+                    Office.office_name,
+                    func.count(Booking.booking_id).label("reservation_count"),
+                )
+                .join(Booking, Booking.desk_code == Desk.desk_code)
+                .join(Floor, Desk.floor_id == Floor.floor_id)
+                .join(Office, Desk.office_id == Office.office_id)
+                .group_by(Desk.desk_id, Desk.local_id, Floor.floor_name, Office.office_name)
+                .order_by(desc(func.count(Booking.booking_id)))
+                .limit(1)
+            )
+
+        result = session.execute(stmt).first()
+
+        if result:
+            messagebox.showinfo(
+                "Most Reserved Desk",
+                "Most reserved desk details:\n"
+                f"Desk code: '{result.desk_code}'\n"
+                f"Floor name: '{result.floor_name}'\n"
+                f"Office name: '{result.office_name}'\n"
+                f"Reservation Count: {result.reservation_count}",
+            )
+        else:
+            messagebox.showinfo("Most Reserved Desk", "No bookings found.")
+
+    except Exception as e:
+        return {"error": f"An error occurred: {e}"}
+
+
+def get_most_frequent_booker(event: Event, session_factory: Callable[[], Session]):
+    """
+    Use SQLAlchemy's select to find the user with the most reservations.
+
+    :param event: The event that triggered the function
+    :param session_factory: A callable that returns a SQLAlchemy session
+    :return: A dictionary containing user details and reservation count
+    """
+    try:
+        with managed_session(session_factory) as session:
+            with managed_session(session_factory) as session:
+                stmt = select(MostFrequentUser).order_by(MostFrequentUser.reservation_count.desc()).limit(1)
+                result = session.execute(stmt).scalars().first()
+
+            if result:
+                messagebox.showinfo(
+                    "Most Frequent User",
+                    "Most frequent user details:\n"
+                    f"User name: '{result.user_name}'\n"
+                    f"Reservation Count: {result.reservation_count}",
+                )
+            else:
+                messagebox.showinfo("Most Frequent User", "No reservations found.")
+
+    except Exception as e:
+        return {"error": f"An error occurred: {e}"}

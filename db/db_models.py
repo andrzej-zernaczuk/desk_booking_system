@@ -197,3 +197,11 @@ class Log(Base):
             f"<Log(log_id={self.log_id}, user_name={self.user_name}, "
             f"event_type='{self.event_type}', event_description='{self.event_description}', created_at={self.created_at})>"
         )
+
+
+class MostFrequentUser(Base):
+    __tablename__ = "most_frequent_users"
+    __table_args__ = {"extend_existing": True}
+
+    user_name = Column(String, primary_key=True)
+    reservation_count = Column(Integer)

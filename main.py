@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from db.sql_db import initialize_app_db
 from db.session_management import initialize_shared_session, close_shared_session, safe_session_factory
 from backend_operations.user_login import login
-from backend_operations.bookings_backend import create_booking
+from backend_operations.bookings_backend import create_booking, get_most_reserved_desk, get_most_frequent_booker
 from gui_operations.bookings_gui import initialize_booking_info
 from gui_operations.gui_utils import show_frame, center_window, on_login_success
 from gui_operations.dropdowns_gui import (
@@ -37,7 +37,6 @@ def start_tkinter_app():
     root.grid_rowconfigure(0, weight=1)
     root.grid_columnconfigure(0, weight=1)
     ################################################### LOGIN #################################################################################
-
     # First Screen: Login Screen
     login_frame = tk.Frame(root)
     login_frame.grid(row=0, column=0, sticky="nsew")
@@ -87,7 +86,6 @@ def start_tkinter_app():
     )
     login_button.grid(row=6, column=1, pady=(20, 10))
     ################################################### DESK SELECTION ########################################################################
-
     # Second Screen: Desk Selection
     desk_selecton_frame = tk.Frame(root)
     desk_selecton_frame.grid_rowconfigure(0, weight=1)
@@ -225,7 +223,7 @@ def start_tkinter_app():
     book_desk_button = tk.Button(
         dropdowns_frame, text=f"Book desk {desk_dropdown.get()}", width=35, font=("Arial", 12), state="disabled"
     )
-    book_desk_button.grid(row=14, column=0, padx=10, pady=40, sticky="we")
+    book_desk_button.grid(row=14, column=0, padx=10, pady=(20, 5), sticky="we")
     book_desk_button.bind(
         "<Button-1>",
         lambda event: (
@@ -249,8 +247,30 @@ def start_tkinter_app():
         ),
     )
     book_desk_button.grid_remove()
-    ################################################### BOOKING INFO ########################################################################
+    ################################################### Statistics ########################################################################
+    statistics_tools_label = tk.Label(dropdowns_frame, text="Statistics", font=("Arial", 12))
+    statistics_tools_label.grid(row=15, column=0, padx=10, pady=(10, 5), sticky="w")
 
+    # Create a frame to hold the sector dropdown and reset button
+    statistics_tools_frame = tk.Frame(dropdowns_frame)
+    statistics_tools_frame.grid(row=16, column=0, padx=10, sticky="we")
+
+    # Button for displaying most reserved desk
+    most_reserved_desk_button = tk.Button(
+        statistics_tools_frame, text="Most Reserved Desk", font=("Arial", 11), state="normal"
+    )
+    most_reserved_desk_button.grid(row=0, column=0, padx=(0, 8), sticky="w")
+    most_reserved_desk_button.bind("<Button-1>", lambda event: get_most_reserved_desk(event, session_factory))
+
+    most_frequent_user_button = tk.Button(
+        statistics_tools_frame, text="Most Frequent User", font=("Arial", 11), state="normal"
+    )
+    most_frequent_user_button.grid(row=0, column=1, sticky="e")
+    most_frequent_user_button.bind(
+        "<Button-1>",
+        lambda event: get_most_frequent_booker(event, session_factory),
+    )
+    ################################################### BOOKING INFO ########################################################################
     # Booking info Frame
     booking_info_frame = tk.Frame(bookings_frame, bg="#cccccc", height=120)
     booking_info_frame.grid(row=0, column=0, padx=20, pady=(0, 10), sticky="new")
