@@ -344,6 +344,7 @@ def get_most_reserved_desk(event: Event, session_factory: Callable[[], Session])
         return {"error": f"An error occurred: {e}"}
 
 
+# PROJECT REQUIREMENT: query view
 def get_most_frequent_booker(event: Event, session_factory: Callable[[], Session]):
     """
     Use SQLAlchemy's select to find the user with the most reservations.
