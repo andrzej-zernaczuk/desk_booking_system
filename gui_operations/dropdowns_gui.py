@@ -2,10 +2,11 @@ import logging
 from PIL import Image, ImageTk
 from typing import Callable, Any
 from sqlalchemy.orm import Session
+from datetime import datetime, timedelta
 from tkinter import messagebox, Event, Button, Label
 from tkinter.ttk import Combobox
-from datetime import datetime, timedelta
 
+from backend_operations.utils import resource_path
 from backend_operations.log_utils import log_event
 from backend_operations.user_login import get_current_user
 from backend_operations.dropdowns_backend import (
@@ -198,7 +199,7 @@ def on_floor_select(
         selected_floor = floor_dropdown.get()
 
         # Update the office layout image
-        floor_template_path = f"office_layouts/{selected_office}_{selected_floor}.png"
+        floor_template_path = resource_path(f"office_layouts/{selected_office}_{selected_floor}.png")
         try:
             floor_template = Image.open(floor_template_path)
             floor_template = floor_template.resize((600, 400), Image.Resampling.LANCZOS)

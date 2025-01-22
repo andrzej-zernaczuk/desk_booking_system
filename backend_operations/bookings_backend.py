@@ -2,7 +2,7 @@ import logging
 import sqlalchemy
 from typing import Callable
 from datetime import datetime
-from sqlalchemy.sql import select, func, desc
+from sqlalchemy.sql import select, desc, func
 from sqlalchemy.orm import Session
 from tkinter import messagebox, Event
 

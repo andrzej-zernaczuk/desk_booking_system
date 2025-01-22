@@ -1,31 +1,57 @@
-import os
+import sys
 import logging
-from dotenv import load_dotenv
 import sqlalchemy
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, scoped_session, Session
 from google.cloud.sql.connector import Connector
 
-from backend_operations.utils import get_time_change
 from db.csv_import import import_table_data
-from db.db_models import Base, Role, Department, Status, Office, Floor, Sector, Desk
+from backend_operations.utils import get_time_change
+from db.db_models import Role, Department, Status, Office, Floor, Sector, Desk, Base
+from backend_operations.utils import (
+    load_environment_variables,
+    get_env_variable,
+    resource_path,
+)
 
-# Load environment variables
-load_dotenv("../.env")
 
-# Initialize Connector object
-connector = Connector()
+# Load environment variables at the start
+load_environment_variables()
+
+# Access specific variables
+USE_PUBLIC_IP = get_env_variable("USE_PUBLIC_IP") == "True"
+SQL_USERNAME = get_env_variable("sql_username")
+SQL_PASSWORD = get_env_variable("sql_password")
+SQL_DATABASE = get_env_variable("sql_database")
 
 
-def getconn() -> sqlalchemy.engine.base.Connection:
-    """Returns a database connection using Google Cloud SQL Connector."""
-    return connector.connect(
-        str(os.getenv("INSTANCE_CONNECTION_NAME")),
-        "pg8000",
-        user=os.getenv("sql_username"),
-        password=os.getenv("sql_password"),
-        db=os.getenv("sql_database"),
-    )
+def getconn():
+    """Returns a database connection for both Public IP and Cloud SQL Connector cases."""
+    try:
+        from pg8000 import connect  # Ensure pg8000 is imported
+
+        if USE_PUBLIC_IP:
+            PUBLIC_IP = get_env_variable("PUBLIC_IP")
+            # Public IP connection
+            return connect(
+                host=PUBLIC_IP,
+                user=SQL_USERNAME,
+                password=SQL_PASSWORD,
+                database=SQL_DATABASE,
+            )
+        else:
+            INSTANCE_CONNECTION_NAME = get_env_variable("INSTANCE_CONNECTION_NAME")
+            connector = Connector()
+            # Google Cloud SQL Connector connection
+            return connector.connect(
+                str(INSTANCE_CONNECTION_NAME),
+                "pg8000",
+                user=SQL_USERNAME,
+                password=SQL_PASSWORD,
+                db=SQL_DATABASE,
+            )
+    except Exception as e:
+        raise RuntimeError(f"Error connecting to database: {e}")
 
 
 def init_engine() -> sqlalchemy.engine.base.Engine:
@@ -52,32 +78,35 @@ def create_tables():
         logging.info("Database tables are ready.")
     except Exception as error:
         logging.error(f"Error while creating tables: {error}")
-        exit()
+        sys.exit()
 
 
 def preload_data():
     """Preloads data into the database from CSV files."""
     try:
         session_import: Session = SessionFactory()
-        import_table_data(session_import, Role, "db/data/roles.csv", ["role_name"])
-        import_table_data(session_import, Department, "db/data/departments.csv", ["department_name"])
-        import_table_data(session_import, Status, "db/data/statuses.csv", ["status_name"])
-        import_table_data(session_import, Office, "db/data/offices.csv", ["office_name"])
-        import_table_data(session_import, Floor, "db/data/floors.csv", ["office_id", "floor_name"])
-        import_table_data(session_import, Sector, "db/data/sectors.csv", ["floor_id", "sector_name"])
+        import_table_data(session_import, Role, resource_path("db/data/roles.csv"), ["role_name"])
+        import_table_data(session_import, Department, resource_path("db/data/departments.csv"), ["department_name"])
+        import_table_data(session_import, Status, resource_path("db/data/statuses.csv"), ["status_name"])
+        import_table_data(session_import, Office, resource_path("db/data/offices.csv"), ["office_name"])
+        import_table_data(session_import, Floor, resource_path("db/data/floors.csv"), ["office_id", "floor_name"])
+        import_table_data(session_import, Sector, resource_path("db/data/sectors.csv"), ["floor_id", "sector_name"])
         import_table_data(
-            session_import, Desk, "db/data/desks.csv", ["office_id", "floor_id", "sector_id", "local_id"]
+            session_import,
+            Desk,
+            resource_path("db/data/desks.csv"),
+            ["office_id", "floor_id", "sector_id", "local_id"],
         )
         session_import.commit()
         logging.info("Data is ready.")
     except ValueError as val_err:
         logging.error(f"Error while preloading data: {val_err}")
         session_import.rollback()
-        exit()
+        sys.exit()
     except Exception as error:
         logging.error(f"Error while preloading data: {error}")
         session_import.rollback()
-        exit()
+        sys.exit()
     finally:
         session_import.close()
 
@@ -158,10 +187,10 @@ def create_trigger(engine):
             except Exception as exc:
                 trig_transaction.rollback()
                 logging.error(f"Error while creating trigger for overlapping bookings: {exc}")
-                exit()
+                sys.exit()
     except Exception as exc:
         logging.error(f"Error while creating trigger for overlapping bookings: {exc}")
-        exit()
+        sys.exit()
 
 
 def initialize_pg_cron(engine):
@@ -185,7 +214,7 @@ def initialize_pg_cron(engine):
 
                 if not result:
                     logging.error("pg_cron extension is not installed. Please install it to use this feature.")
-                    exit()
+                    sys.exit()
 
                 # Get current time offset from UTC for Poland
                 time_change = get_time_change()
@@ -232,10 +261,10 @@ def initialize_pg_cron(engine):
             except Exception as exc:
                 pg_cron_transaction.rollback()
                 logging.error(f"Error while creating cron job for booking status updates: {exc}")
-                exit()
+                sys.exit()
     except:
         logging.error("Error while initializing pg_cron.")
-        exit()
+        sys.exit()
 
 
 # PROJECT REQUIREMENT: views
@@ -252,7 +281,6 @@ def create_most_frequent_users_view(engine):
             transaction = connection.begin()
 
             try:
-                connection.execute(sqlalchemy.text("DROP TABLE IF EXISTS most_frequent_users;"))
                 connection.execute(sqlalchemy.text("DROP VIEW IF EXISTS most_frequent_users;"))
                 connection.execute(
                     sqlalchemy.text(
@@ -287,8 +315,8 @@ def create_most_frequent_users_view(engine):
 def initialize_app_db():
     """Initialize the application by setting up the database."""
     try:
-        create_tables()  # Create tables
-        preload_data()  # Preload data
+        create_tables()
+        preload_data()
         create_trigger(desk_booking_engine)
         initialize_pg_cron(desk_booking_engine)
         create_most_frequent_users_view(desk_booking_engine)

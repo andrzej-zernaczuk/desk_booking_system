@@ -2,10 +2,10 @@ import logging
 from typing import Callable, Optional
 from sqlalchemy.sql import select
 from sqlalchemy.orm import Session
-from backend_operations.log_utils import log_event
 
 from db.db_models import Office, Floor, Sector, Desk
 from db.session_management import managed_session
+from backend_operations.log_utils import log_event
 from backend_operations.user_login import get_current_user
 
 

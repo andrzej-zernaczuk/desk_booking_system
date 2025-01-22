@@ -1,3 +1,4 @@
+import sys
 import logging
 import tkinter as tk
 from tkinter import ttk, messagebox
@@ -5,7 +6,7 @@ from datetime import datetime, timedelta
 
 from db.sql_db import initialize_app_db
 from db.session_management import initialize_shared_session, close_shared_session, safe_session_factory
-from backend_operations.user_login import login
+from backend_operations.user_login import login, check_debug_mode
 from backend_operations.bookings_backend import create_booking, get_most_reserved_desk, get_most_frequent_booker
 from gui_operations.bookings_gui import initialize_booking_info
 from gui_operations.gui_utils import show_frame, center_window, on_login_success
@@ -122,7 +123,6 @@ def start_tkinter_app():
     date_dropdown["values"] = available_dates
     date_dropdown.set(available_dates[0])  # Default to today's date
 
-    # debug set today to yesterday 23:45
     if today.hour == 23 and today.minute >= 30:
         # Update the date dropdown to the next day
         next_date = (today + timedelta(days=1)).strftime("%Y-%m-%d")
@@ -221,7 +221,7 @@ def start_tkinter_app():
 
     # Button for booking the desk
     book_desk_button = tk.Button(
-        dropdowns_frame, text=f"Book desk {desk_dropdown.get()}", width=35, font=("Arial", 12), state="disabled"
+        dropdowns_frame, text=f"Book desk {desk_dropdown.get()}", width=35, font=("Arial", 12), state="active"
     )
     book_desk_button.grid(row=14, column=0, padx=10, pady=(20, 5), sticky="we")
     book_desk_button.bind(
@@ -299,7 +299,7 @@ def start_tkinter_app():
         "relief": "flat",
         "width": 12,
         "height": 2,
-    }  # Bigger buttons
+    }
 
     check_in_button = tk.Button(booking_info_frame, text="Check In", state="disabled", **button_style)
     check_in_button.grid(row=0, column=1, padx=20, pady=(10, 5), sticky="e")
@@ -334,11 +334,12 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
     try:
-        initialize_app_db()
+        if check_debug_mode():
+            initialize_app_db()
         logging.info("Application initialized successfully!")
     except Exception as error:
         logging.error(f"Application initialization failed: {error} \n :(((")
-        exit(1)
+        sys.exit(1)
 
     # Start the GUI application
     start_tkinter_app()

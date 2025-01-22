@@ -1,7 +1,7 @@
-from tkinter import Tk, Frame, Label, Button
 from typing import Callable
 from sqlalchemy.orm import Session
 from screeninfo import get_monitors
+from tkinter import Tk, Frame, Label, Button
 
 from gui_operations.bookings_gui import initialize_booking_info
 

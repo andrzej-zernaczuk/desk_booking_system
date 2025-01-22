@@ -142,7 +142,13 @@ def handle_cancel_booking(
             return
 
         # Notify the user
-        messagebox.showinfo("Success", "Your booking has been successfully canceled.")
+        messagebox.showinfo(
+            "Success",
+            "Your booking has been successfully canceled! Details:\n"
+            f"Desk code: '{current_booking['desk_code']}'\n"
+            f"Start time: '{current_booking["start_time"]}'\n"
+            f"End time: '{current_booking["end_time"]}'",
+        )
 
         # Fetch the next booking from the backend
         next_booking = check_user_current_or_next_booking(session_factory)
@@ -185,7 +191,7 @@ def handle_cancel_booking(
             toggle_booking_info_frame(False, bookings_frame, booking_info_frame, floor_image_frame)
 
     except Exception as exc:
-        logging.error(f"Error during booking cancellation: {exc}")
+        logging.error(f"Error during booking cancellation for {user}: {exc}")
         messagebox.showerror("Error", "Failed to cancel booking. Please try again.")
 
 

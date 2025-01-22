@@ -1,15 +1,15 @@
-import os
+import sys
 import bcrypt
 import logging
 from typing import Callable
+from tkinter import messagebox
 from sqlalchemy import select
-from dotenv import load_dotenv
 from sqlalchemy.orm import Session
-from tkinter import messagebox, Frame
 
 from db.db_models import User
 from db.sql_db import SessionFactory
 from backend_operations.log_utils import log_event
+from backend_operations.utils import get_env_variable
 
 
 # Initialize global variable storing logged-in user ID
@@ -42,10 +42,9 @@ def login(email: str, password: str, on_success_callback: Callable[[], None]) ->
     session: Session = SessionFactory()
 
     try:
-        # Use session.execute() with a select statement
-        stmt = select(User).where(User.email == email)
+        stmt = select(User).where(User.user_name == email)
         result = session.execute(stmt)
-        user = result.scalar_one_or_none()  # Get a single result or None if not found
+        user = result.scalar_one_or_none()
 
         if not user:
             logging.error(f"User with email {email} not found.")
@@ -55,11 +54,10 @@ def login(email: str, password: str, on_success_callback: Callable[[], None]) ->
 
         # Verify the password
         if bcrypt.checkpw(password.encode("utf-8"), user.password.encode("utf-8")):
-            set_current_user(user.email)
-            logging.info(f"User with email {user.email} logged in successfully.")
+            set_current_user(email)
+            logging.info(f"User with email {email} logged in successfully.")
             log_event(get_current_user(), "Success", "Login", f"Successful login")
 
-            # TODO: Update user status to online
             on_success_callback()
         else:
             logging.error(f"Invalid password for user with email {email}.")
@@ -75,15 +73,13 @@ def login(email: str, password: str, on_success_callback: Callable[[], None]) ->
 
 def check_debug_mode() -> bool:
     """Check if the debug mode is enabled."""
-    load_dotenv("../.env")
-    is_debug_mode = os.getenv("debug_mode")
+    is_debug_mode = get_env_variable("debug_mode")
     return is_debug_mode == "True"
 
 
 def get_debug_user() -> str:
     """Return the debug user."""
-    load_dotenv("../.env")
-    debug_acc = os.getenv("debug_account")
+    debug_acc = get_env_variable("debug_account")
     if not debug_acc:
         raise ValueError("Debug account is not set in the .env file.")
 
@@ -93,7 +89,8 @@ def get_debug_user() -> str:
 def get_current_user() -> str:
     """Return the current user."""
     if not CURRENT_USER:
-        raise ValueError("CURRENT_USER is not set. Critical error.")
+        logging.error("CURRENT_USER is not set. Critical error.")
+        sys.exit()
 
     return CURRENT_USER
 
